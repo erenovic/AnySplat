@@ -1,53 +1,31 @@
 import copy
 
 # VGGT parts
-import os
-import sys
-from copy import deepcopy
 from dataclasses import dataclass
-from typing import List, Literal, Optional
+from typing import Literal
 
 import torch
 import torch.nn.functional as F
-import torchvision
 from einops import rearrange
-from huggingface_hub import PyTorchModelHubMixin
 from jaxtyping import Float
-from src.dataset.shims.bounds_shim import apply_bounds_shim
 from src.dataset.shims.normalize_shim import apply_normalize_shim
-from src.dataset.shims.patch_shim import apply_patch_shim
 from src.dataset.types import BatchedExample, DataShim
-from src.geometry.projection import sample_image_grid
-
 from src.model.encoder.heads.vggt_dpt_gs_head import VGGT_DPT_GS_Head
-from src.model.encoder.vggt.utils.geometry import (
-    batchify_unproject_depth_map_to_point_map,
-    unproject_depth_map_to_point_map,
-)
+from src.model.encoder.vggt.models.vggt import VGGT
+from src.model.encoder.vggt.utils.geometry import batchify_unproject_depth_map_to_point_map
 from src.model.encoder.vggt.utils.pose_enc import pose_encoding_to_extri_intri
-from src.utils.geometry import get_rel_pos  # used for model hub
-from torch import nn, Tensor
+from torch import Tensor, nn
 from torch_scatter import scatter_add, scatter_max
 
 from ..types import Gaussians
-from .backbone import Backbone, BackboneCfg, get_backbone
-
-from .backbone.croco.misc import transpose_to_landscape
+from .backbone import BackboneCfg
 from .common.gaussian_adapter import (
     GaussianAdapter,
     GaussianAdapterCfg,
     UnifiedGaussianAdapter,
 )
 from .encoder import Encoder, EncoderOutput
-from .heads import head_factory
 from .visualization.encoder_visualizer_epipolar_cfg import EncoderVisualizerEpipolarCfg
-
-root_path = os.path.abspath(".")
-sys.path.append(root_path)
-from src.model.encoder.heads.head_modules import TransformerBlockSelfAttn
-from src.model.encoder.vggt.heads.dpt_head import DPTHead
-from src.model.encoder.vggt.layers.mlp import Mlp
-from src.model.encoder.vggt.models.vggt import VGGT
 
 inf = float("inf")
 
@@ -112,7 +90,7 @@ class EncoderAnySplatCfg:
     render_conf: bool = False
     opacity_conf: bool = False
     conf_threshold: float = 0.1
-    intermediate_layer_idx: Optional[List[int]] = None
+    intermediate_layer_idx: list[int] | None = None
     voxelize: bool = False
 
 
@@ -189,9 +167,7 @@ class EncoderAnySplat(Encoder[EncoderAnySplatCfg]):
                             param.requires_grad = False
                 else:
                     for name, param in self.named_parameters():
-                        param.requires_grad = (
-                            freeze_module not in name and "distill" not in name
-                        )
+                        param.requires_grad = freeze_module not in name and "distill" not in name
 
         self.pose_free = cfg.pose_free
         if self.pose_free:
@@ -237,13 +213,9 @@ class EncoderAnySplat(Encoder[EncoderAnySplatCfg]):
             pts3d, valid_mask = pts3ds[bs], valid_masks[bs]
             if original_extrinsics is not None:
                 camera_c2w = original_extrinsics[bs]
-                first_camera_w2c = (
-                    camera_c2w[0].inverse().unsqueeze(0).repeat(pts3d.shape[0], 1, 1)
-                )
+                first_camera_w2c = camera_c2w[0].inverse().unsqueeze(0).repeat(pts3d.shape[0], 1, 1)
 
-                pts3d_homo = torch.cat(
-                    [pts3d, torch.ones_like(pts3d[:, :, :, :1])], dim=-1
-                )
+                pts3d_homo = torch.cat([pts3d, torch.ones_like(pts3d[:, :, :, :1])], dim=-1)
                 transformed_pts3d = torch.bmm(
                     first_camera_w2c, pts3d_homo.flatten(1, 2).transpose(1, 2)
                 ).transpose(1, 2)[..., :3]
@@ -260,9 +232,7 @@ class EncoderAnySplat(Encoder[EncoderAnySplatCfg]):
             scale_factors.append(scene_scale)
         return torch.stack(pts3d_norms, dim=0), torch.stack(scale_factors, dim=0)
 
-    def align_pts_all_with_pts3d(
-        self, pts_all, pts3d, valid_mask, original_extrinsics=None
-    ):
+    def align_pts_all_with_pts3d(self, pts_all, pts3d, valid_mask, original_extrinsics=None):
         # align pts_all with pts3d
         B = pts_all.shape[0]
 
@@ -279,9 +249,7 @@ class EncoderAnySplat(Encoder[EncoderAnySplatCfg]):
         for t in tensor_list:
             pad_len = pad_shape[0] - t.shape[0]
             if pad_len > 0:
-                padding = torch.full(
-                    (pad_len, *t.shape[1:]), value, device=t.device, dtype=t.dtype
-                )
+                padding = torch.full((pad_len, *t.shape[1:]), value, device=t.device, dtype=t.dtype)
                 t = torch.cat([t, padding], dim=0)
             padded.append(t)
         return torch.stack(padded)
@@ -304,21 +272,15 @@ class EncoderAnySplat(Encoder[EncoderAnySplatCfg]):
         # Compute softmax weights per voxel
         conf_voxel_max, _ = scatter_max(conf_flat, inverse_indices, dim=0)
         conf_exp = torch.exp(conf_flat - conf_voxel_max[inverse_indices])
-        voxel_weights = scatter_add(
-            conf_exp, inverse_indices, dim=0
-        )  # [num_unique_voxels]
-        weights = (conf_exp / (voxel_weights[inverse_indices] + 1e-6)).unsqueeze(
-            -1
-        )  # [B*V*N, 1]
+        voxel_weights = scatter_add(conf_exp, inverse_indices, dim=0)  # [num_unique_voxels]
+        weights = (conf_exp / (voxel_weights[inverse_indices] + 1e-6)).unsqueeze(-1)  # [B*V*N, 1]
 
         # Compute weighted average of positions and features
         weighted_pts = pts3d_flatten * weights
         weighted_feats = anchor_feats_flat.squeeze(1) * weights
 
         # Aggregate per voxel
-        voxel_pts = scatter_add(
-            weighted_pts, inverse_indices, dim=0
-        )  # [num_unique_voxels, 3]
+        voxel_pts = scatter_add(weighted_pts, inverse_indices, dim=0)  # [num_unique_voxels, 3]
         voxel_feats = scatter_add(
             weighted_feats, inverse_indices, dim=0
         )  # [num_unique_voxels, feat_dim]
@@ -329,7 +291,7 @@ class EncoderAnySplat(Encoder[EncoderAnySplatCfg]):
         self,
         image: torch.Tensor,
         global_step: int = 0,
-        visualization_dump: Optional[dict] = None,
+        visualization_dump: dict | None = None,
     ) -> Gaussians:
         device = image.device
         b, v, _, h, w = image.shape
@@ -426,16 +388,12 @@ class EncoderAnySplat(Encoder[EncoderAnySplatCfg]):
                     images=image,
                     patch_start_idx=patch_start_idx,
                 )
-                pts_all = batchify_unproject_depth_map_to_point_map(
-                    depth_map, extrinsic, intrinsic
-                )
+                pts_all = batchify_unproject_depth_map_to_point_map(depth_map, extrinsic, intrinsic)
             else:
                 raise ValueError(f"Invalid pred_head_type: {self.cfg.pred_head_type}")
 
             if self.cfg.render_conf:
-                conf_valid = torch.quantile(
-                    depth_conf.flatten(0, 1), self.cfg.conf_threshold
-                )
+                conf_valid = torch.quantile(depth_conf.flatten(0, 1), self.cfg.conf_threshold)
                 conf_valid_mask = depth_conf > conf_valid
             else:
                 conf_valid_mask = torch.ones_like(depth_conf, dtype=torch.bool)
@@ -476,9 +434,7 @@ class EncoderAnySplat(Encoder[EncoderAnySplatCfg]):
                 neural_pts_list.append(pts_all[b_i][conf_valid_mask[b_i]])
 
         max_voxels = max(f.shape[0] for f in neural_feats_list)
-        neural_feats = self.pad_tensor_list(
-            neural_feats_list, (max_voxels,), value=-1e10
-        )
+        neural_feats = self.pad_tensor_list(neural_feats_list, (max_voxels,), value=-1e10)
 
         neural_pts = self.pad_tensor_list(
             neural_pts_list, (max_voxels,), -1e4
@@ -493,9 +449,7 @@ class EncoderAnySplat(Encoder[EncoderAnySplatCfg]):
         opacity = self.map_pdf_to_opacity(densities, global_step).squeeze(-1)
         if self.cfg.opacity_conf:
             shift = torch.quantile(depth_conf, self.cfg.conf_threshold)
-            opacity = opacity * torch.sigmoid(depth_conf - shift)[
-                conf_valid_mask
-            ].unsqueeze(
+            opacity = opacity * torch.sigmoid(depth_conf - shift)[conf_valid_mask].unsqueeze(
                 0
             )  # little bit hacky
 
@@ -520,9 +474,7 @@ class EncoderAnySplat(Encoder[EncoderAnySplatCfg]):
 
             neural_pts = neural_pts[gaussian_usage].view(b, -1, 3).contiguous()
             depths = depths[gaussian_usage].view(b, -1, 1).contiguous()
-            neural_feats = (
-                neural_feats[gaussian_usage].view(b, -1, self.raw_gs_dim).contiguous()
-            )
+            neural_feats = neural_feats[gaussian_usage].view(b, -1, self.raw_gs_dim).contiguous()
             opacity = opacity[gaussian_usage].view(b, -1).contiguous()
 
             print(
@@ -549,7 +501,7 @@ class EncoderAnySplat(Encoder[EncoderAnySplatCfg]):
         infos["voxelize_ratio"] = densities.shape[1] / (h * w * v)
 
         print(
-            f"scene scale: {scene_scale:.3f}, pixel-wise num: {h*w*v}, after voxelize: {neural_pts.shape[1]}, voxelize ratio: {infos['voxelize_ratio']:.3f}"
+            f"scene scale: {scene_scale:.3f}, pixel-wise num: {h * w * v}, after voxelize: {neural_pts.shape[1]}, voxelize ratio: {infos['voxelize_ratio']:.3f}"
         )
         print(
             f"Gaussians attributes: \n"
@@ -571,11 +523,11 @@ class EncoderAnySplat(Encoder[EncoderAnySplatCfg]):
         return EncoderOutput(
             gaussians=gaussians,
             pred_pose_enc_list=pred_pose_enc_list,
-            pred_context_pose=dict(
-                extrinsic=torch.cat([extrinsic, extrinsic_padding], dim=2).inverse(),
-                intrinsic=intrinsic,
-            ),
-            depth_dict=dict(depth=depth_map, conf_valid_mask=conf_valid_mask),
+            pred_context_pose={
+                "extrinsic": torch.cat([extrinsic, extrinsic_padding], dim=2).inverse(),
+                "intrinsic": intrinsic,
+            },
+            depth_dict={"depth": depth_map, "conf_valid_mask": conf_valid_mask},
             infos=infos,
             distill_infos=distill_infos,
         )
