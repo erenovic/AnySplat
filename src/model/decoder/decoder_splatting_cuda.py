@@ -7,7 +7,6 @@ from gsplat import rasterization
 from jaxtyping import Float
 from torch import Tensor
 
-from ...misc.utils import vis_depth_map
 from ..types import Gaussians
 
 # from .cuda_splatting import DepthRenderingMode, render_cuda

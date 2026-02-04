@@ -1,17 +1,15 @@
 from dataclasses import dataclass
-from typing import Optional
 
 import torch
 import torch.nn.functional as F
 from einops import einsum, rearrange
 from jaxtyping import Float
+from src.geometry.projection import get_world_rays
 from torch import Tensor, nn
 
-from src.geometry.projection import get_world_rays
-from src.misc.sh_rotation import rotate_sh
+from ...types import Gaussians
 from .gaussians import build_covariance
 
-from ...types import Gaussians
 
 @dataclass
 class GaussianAdapterCfg:
@@ -51,7 +49,7 @@ class GaussianAdapter(nn.Module):
     ) -> Gaussians:
         device = extrinsics.device
         scales, rotations, sh = raw_gaussians.split((3, 4, 3 * self.d_sh), dim=-1)
-        
+
         # Map scale features to valid scale range.
         scale_min = self.cfg.gaussian_scale_min
         scale_max = self.cfg.gaussian_scale_max
@@ -87,7 +85,7 @@ class GaussianAdapter(nn.Module):
             scales=scales,
             rotations=rotations.broadcast_to((*scales.shape[:-1], 4)),
         )
-        
+
     def get_scale_multiplier(
         self,
         intrinsics: Float[Tensor, "*#batch 3 3"],
@@ -119,22 +117,22 @@ class UnifiedGaussianAdapter(GaussianAdapter):
         opacities: Float[Tensor, "*#batch"],
         raw_gaussians: Float[Tensor, "*#batch _"],
         eps: float = 1e-8,
-        intrinsics: Optional[Float[Tensor, "*#batch 3 3"]] = None,
-        coordinates: Optional[Float[Tensor, "*#batch 2"]] = None,
+        intrinsics: Float[Tensor, "*#batch 3 3"] | None = None,
+        coordinates: Float[Tensor, "*#batch 2"] | None = None,
     ) -> Gaussians:
         scales, rotations, sh = raw_gaussians.split((3, 4, 3 * self.d_sh), dim=-1)
-        
+
         scales = 0.001 * F.softplus(scales)
         scales = scales.clamp_max(0.3)
-        
+
         # Normalize the quaternion features to yield a valid quaternion.
         rotations = rotations / (rotations.norm(dim=-1, keepdim=True) + eps)
-        
+
         sh = rearrange(sh, "... (xyz d_sh) -> ... xyz d_sh", xyz=3)
         sh = sh.broadcast_to((*opacities.shape, 3, self.d_sh)) * self.sh_mask
         # print(scales.max())
         covariances = build_covariance(scales, rotations)
-        
+
         return Gaussians(
             means=means.float(),
             # levels=levels.int(),
@@ -145,6 +143,7 @@ class UnifiedGaussianAdapter(GaussianAdapter):
             rotations=rotations.float(),
         )
 
+
 class Unet3dGaussianAdapter(GaussianAdapter):
     def forward(
         self,
@@ -153,22 +152,22 @@ class Unet3dGaussianAdapter(GaussianAdapter):
         opacities: Float[Tensor, "*#batch"],
         raw_gaussians: Float[Tensor, "*#batch _"],
         eps: float = 1e-8,
-        intrinsics: Optional[Float[Tensor, "*#batch 3 3"]] = None,
-        coordinates: Optional[Float[Tensor, "*#batch 2"]] = None,
+        intrinsics: Float[Tensor, "*#batch 3 3"] | None = None,
+        coordinates: Float[Tensor, "*#batch 2"] | None = None,
     ) -> Gaussians:
         scales, rotations, sh = raw_gaussians.split((3, 4, 3 * self.d_sh), dim=-1)
-        
+
         scales = 0.001 * F.softplus(scales)
         scales = scales.clamp_max(0.3)
-        
+
         # Normalize the quaternion features to yield a valid quaternion.
         rotations = rotations / (rotations.norm(dim=-1, keepdim=True) + eps)
-        
+
         sh = rearrange(sh, "... (xyz d_sh) -> ... xyz d_sh", xyz=3)
         sh = sh.broadcast_to((*opacities.shape, 3, self.d_sh)) * self.sh_mask
 
         covariances = build_covariance(scales, rotations)
-        
+
         return Gaussians(
             means=means,
             covariances=covariances,
@@ -177,4 +176,3 @@ class Unet3dGaussianAdapter(GaussianAdapter):
             scales=scales,
             rotations=rotations,
         )
-

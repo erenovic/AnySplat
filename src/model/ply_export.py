@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from einops import einsum, rearrange
+from einops import rearrange
 from jaxtyping import Float
 from plyfile import PlyData, PlyElement
 from scipy.spatial.transform import Rotation as R
