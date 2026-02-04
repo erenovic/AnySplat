@@ -26,7 +26,7 @@ def construct_list_of_attributes(num_rest: int) -> list[str]:
 def export_ply(
     means: Float[Tensor, "gaussian 3"],
     scales: Float[Tensor, "gaussian 3"],
-    rotations: Float[Tensor, "gaussian 4"],
+    rotations: Float[Tensor, "gaussian 4"],  # wxyz format
     harmonics: Float[Tensor, "gaussian 3 d_sh"],
     opacities: Float[Tensor, " gaussian"],
     path: Path,
@@ -45,7 +45,7 @@ def export_ply(
     # Apply the rotation to the Gaussian rotations.
     rotations = R.from_quat(rotations.detach().cpu().numpy()).as_matrix()
     rotations = R.from_matrix(rotations).as_quat()
-    x, y, z, w = rearrange(rotations, "g xyzw -> xyzw g")
+    w, x, y, z = rearrange(rotations, "g wxyz -> wxyz g")
     rotations = np.stack((w, x, y, z), axis=-1)
 
     # Since current model use SH_degree = 4,
@@ -53,7 +53,10 @@ def export_ply(
     f_dc = harmonics[..., 0]
     f_rest = harmonics[..., 1:].flatten(start_dim=1)
 
-    dtype_full = [(attribute, "f4") for attribute in construct_list_of_attributes(0 if save_sh_dc_only else f_rest.shape[1])]
+    dtype_full = [
+        (attribute, "f4")
+        for attribute in construct_list_of_attributes(0 if save_sh_dc_only else f_rest.shape[1])
+    ]
     elements = np.empty(means.shape[0], dtype=dtype_full)
     attributes = [
         means.detach().cpu().numpy(),

@@ -11,5 +11,6 @@ class Gaussians:
     harmonics: Float[Tensor, "batch gaussian 3 d_sh"] | Float[Tensor, "gaussian 3 d_sh"]
     opacities: Float[Tensor, "batch gaussian"] | Float[Tensor, " gaussian"]
     scales: Float[Tensor, "batch gaussian 3"] | Float[Tensor, "gaussian 3"]
+    # wxyz convention required for rotations / quaternions (see `rasterization` in `gsplat`)
     rotations: Float[Tensor, "batch gaussian 4"] | Float[Tensor, "gaussian 4"]
     # levels: Float[Tensor, "batch gaussian"]
