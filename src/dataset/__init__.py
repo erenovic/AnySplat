@@ -1,14 +1,15 @@
-from dataclasses import fields
-from typing import Callable
-from torch.utils.data import Dataset, ConcatDataset
 import bisect
+from collections.abc import Callable
+from dataclasses import fields
+
+from torch.utils.data import ConcatDataset, Dataset
 
 from ..misc.step_tracker import StepTracker
-from .types import Stage
-from .view_sampler import get_view_sampler
+from .dataset_co3d import DatasetCo3d, DatasetCo3dCfgWrapper
 from .dataset_dl3dv import DatasetDL3DV, DatasetDL3DVCfgWrapper
 from .dataset_scannetpp import DatasetScannetpp, DatasetScannetppCfgWrapper
-from .dataset_co3d import DatasetCo3d, DatasetCo3dCfgWrapper
+from .types import Stage
+from .view_sampler import get_view_sampler
 
 DATASETS: dict[str, Dataset] = {
     "co3d": DatasetCo3d,
@@ -18,23 +19,26 @@ DATASETS: dict[str, Dataset] = {
 
 DatasetCfgWrapper = DatasetDL3DVCfgWrapper | DatasetScannetppCfgWrapper | DatasetCo3dCfgWrapper
 
+
 class TestDatasetWarpper(Dataset):
     def __init__(self, dataset: Dataset):
         self.dataset = dataset
 
     def __getitem__(self, idx):
+        return self.dataset[
+            (
+                idx,
+                self.dataset.view_sampler.num_context_views,
+                self.dataset.cfg.input_image_shape[1] // 14,
+            )
+        ]  # fake parameters here, to fit the input of dataset
 
-        return self.dataset[(idx, self.dataset.view_sampler.num_context_views, self.dataset.cfg.input_image_shape[1] // 14)] # fake parameters here, to fit the input of dataset
-    
     def __len__(self):
         return len(self.dataset)
 
-        
-    
+
 class CustomConcatDataset(ConcatDataset):
-
     def __getitem__(self, idx_tuple):
-
         if isinstance(idx_tuple, list):
             idx_tuple = idx_tuple[0]
 
@@ -55,7 +59,7 @@ def get_dataset(
     cfgs: list[DatasetCfgWrapper],
     stage: Stage,
     step_tracker: StepTracker | None,
-    dataset_shim: Callable[[Dataset, str], Dataset]
+    dataset_shim: Callable[[Dataset, str], Dataset],
 ) -> list[Dataset]:
     datasets = []
     if stage != "test":
@@ -64,7 +68,7 @@ def get_dataset(
         for cfg in cfgs:
             (field,) = fields(type(cfg))
             cfg = getattr(cfg, field.name)
-            
+
             view_sampler = get_view_sampler(
                 cfg.view_sampler,
                 stage,
@@ -82,7 +86,7 @@ def get_dataset(
         cfg = cfgs[0]
         (field,) = fields(type(cfg))
         cfg = getattr(cfg, field.name)
-        
+
         view_sampler = get_view_sampler(
             cfg.view_sampler,
             stage,

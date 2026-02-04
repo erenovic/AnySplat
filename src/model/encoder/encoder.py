@@ -1,14 +1,15 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Generic, TypeVar
 
-from torch import nn
-from dataclasses import dataclass
-from src.dataset.types import BatchedViews, DataShim
-from ..types import Gaussians
 from jaxtyping import Float
+from src.dataset.types import BatchedViews, DataShim
 from torch import Tensor, nn
 
+from ..types import Gaussians
+
 T = TypeVar("T")
+
 
 @dataclass
 class EncoderOutput:
@@ -18,6 +19,7 @@ class EncoderOutput:
     depth_dict: dict | None
     infos: dict | None
     distill_infos: dict | None
+
 
 class Encoder(nn.Module, ABC, Generic[T]):
     cfg: T

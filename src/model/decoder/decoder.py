@@ -7,12 +7,8 @@ from torch import Tensor, nn
 
 from ..types import Gaussians
 
-DepthRenderingMode = Literal[
-    "depth",
-    "log",
-    "disparity",
-    "relative_disparity",
-]
+DepthRenderingMode = Literal["depth", "log", "disparity", "relative_disparity"]
+T = TypeVar("T")
 
 
 @dataclass
@@ -22,8 +18,6 @@ class DecoderOutput:
     alpha: Float[Tensor, "batch view height width"] | None
     lod_rendering: dict | None
 
-T = TypeVar("T")
-
 
 class Decoder(nn.Module, ABC, Generic[T]):
     cfg: T
@@ -31,7 +25,7 @@ class Decoder(nn.Module, ABC, Generic[T]):
     def __init__(self, cfg: T) -> None:
         super().__init__()
         self.cfg = cfg
-    
+
     @abstractmethod
     def forward(
         self,

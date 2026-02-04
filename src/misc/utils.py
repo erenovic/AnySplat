@@ -1,7 +1,7 @@
 import torch
-
-from src.visualization.color_map import apply_color_map_to_image
 import torch.distributed as dist
+from src.visualization.color_map import apply_color_map_to_image
+
 
 def inverse_normalize(tensor, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)):
     mean = torch.as_tensor(mean, dtype=tensor.dtype, device=tensor.device).view(-1, 1, 1)
@@ -21,7 +21,7 @@ def vis_depth_map(result, near=None, far=None):
     else:
         near = near.log()
         far = far.log()
-    
+
     result = result.log()
     result = 1 - (result - near) / (far - near)
     return apply_color_map_to_image(result, "turbo")
