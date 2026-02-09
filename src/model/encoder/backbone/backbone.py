@@ -2,9 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
 from jaxtyping import Float
-from torch import Tensor, nn
-
 from src.dataset.types import BatchedViews
+from torch import Tensor, nn
 
 T = TypeVar("T")
 

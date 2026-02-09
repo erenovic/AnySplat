@@ -9,6 +9,10 @@ from .view_sampler_bounded import ViewSamplerBounded, ViewSamplerBoundedCfg
 from .view_sampler_bounded_v2 import ViewSamplerBoundedV2, ViewSamplerBoundedV2Cfg
 from .view_sampler_evaluation import ViewSamplerEvaluation, ViewSamplerEvaluationCfg
 from .view_sampler_rank import ViewSamplerRank, ViewSamplerRankCfg
+from .view_sampler_sequential_target import (
+    ViewSamplerSequentialTarget,
+    ViewSamplerSequentialTargetCfg,
+)
 
 VIEW_SAMPLERS: dict[str, ViewSampler[Any]] = {
     "all": ViewSamplerAll,
@@ -17,6 +21,7 @@ VIEW_SAMPLERS: dict[str, ViewSampler[Any]] = {
     "boundedv2": ViewSamplerBoundedV2,
     "evaluation": ViewSamplerEvaluation,
     "rank": ViewSamplerRank,
+    "sequential_target": ViewSamplerSequentialTarget,
 }
 
 ViewSamplerCfg = (
@@ -26,6 +31,7 @@ ViewSamplerCfg = (
     | ViewSamplerEvaluationCfg
     | ViewSamplerAllCfg
     | ViewSamplerRankCfg
+    | ViewSamplerSequentialTargetCfg
 )
 
 

@@ -15,6 +15,57 @@ from .decoder import Decoder, DecoderOutput
 DepthRenderingMode = Literal["depth", "disparity", "relative_disparity", "log"]
 
 
+def sort_gaussians_by_position(
+    xyzs: Float[Tensor, "batch N 3"],
+    opacities: Float[Tensor, "batch N 1"],
+    rotations: Float[Tensor, "batch N 4"],
+    scales: Float[Tensor, "batch N 3"],
+    features: Float[Tensor, "batch N C D"],
+    covariances: Float[Tensor, "batch N 3 3"],
+) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor, Tensor]:
+    """Sort Gaussians by 3D position with priority x > y > z (vectorized).
+
+    Uses quantization-based lexicographic sorting for efficiency.
+    All attributes are sorted consistently using the same indices.
+    Fully vectorized across batch dimension for better GPU utilization.
+    """
+    B, N, _ = xyzs.shape
+
+    # Normalize coordinates to [0, 1] range per batch item
+    xyz_min = xyzs.min(dim=1, keepdim=True).values  # [B, 1, 3]
+    xyz_max = xyzs.max(dim=1, keepdim=True).values  # [B, 1, 3]
+    xyz_range = (xyz_max - xyz_min).clamp(min=1e-6)
+    xyz_normalized = (xyzs - xyz_min) / xyz_range  # [B, N, 3] in [0, 1]
+
+    # Create composite sort key: x has highest priority, then y, then z
+    # Quantize to 21 bits per dimension (fits in int64)
+    QUANT_LEVELS = 2097152  # 2^21
+    x_quant = (xyz_normalized[..., 0] * (QUANT_LEVELS - 1)).long()  # [B, N]
+    y_quant = (xyz_normalized[..., 1] * (QUANT_LEVELS - 1)).long()  # [B, N]
+    z_quant = (xyz_normalized[..., 2] * (QUANT_LEVELS - 1)).long()  # [B, N]
+    sort_key = (x_quant << 42) | (y_quant << 21) | z_quant  # [B, N]
+
+    # Sort each batch independently
+    sort_indices = torch.argsort(sort_key, dim=1)  # [B, N]
+
+    # Helper function to gather along dim=1 for tensors with varying trailing dims
+    def gather_sorted(tensor: Tensor, indices: Tensor) -> Tensor:
+        # tensor: [B, N, ...], indices: [B, N]
+        # Expand indices to match tensor's shape
+        idx_shape = list(indices.shape) + [1] * (tensor.ndim - 2)
+        idx_expanded = indices.view(*idx_shape).expand_as(tensor)
+        return torch.gather(tensor, dim=1, index=idx_expanded)
+
+    return (
+        gather_sorted(xyzs, sort_indices),
+        gather_sorted(opacities, sort_indices),
+        gather_sorted(rotations, sort_indices),
+        gather_sorted(scales, sort_indices),
+        gather_sorted(features, sort_indices),
+        gather_sorted(covariances, sort_indices),
+    )
+
+
 @dataclass
 class DecoderSplattingCUDACfg:
     name: Literal["splatting_cuda"]
@@ -60,6 +111,11 @@ class DecoderSplattingCUDA(Decoder[DecoderSplattingCUDACfg]):
             gaussians.harmonics.permute(0, 1, 3, 2).contiguous(),
         )
         covariances = gaussians.covariances
+
+        # # Sort Gaussians by 3D position (priority: x > y > z)
+        # xyzs, opacitys, rotations, scales, features, covariances = sort_gaussians_by_position(
+        #     xyzs, opacitys, rotations, scales, features, covariances
+        # )
         for i in range(B):
             xyz_i = xyzs[i].float()
             feature_i = features[i].float()
@@ -104,9 +160,10 @@ class DecoderSplattingCUDA(Decoder[DecoderSplattingCUDACfg]):
                 rendering_list.append(rendering_img.permute(0, 3, 1, 2))
                 rendering_depth_list.append(rendering_depth)
                 rendering_alpha_list.append(alpha)
-            rendered_depths.append(torch.cat(rendering_depth_list, dim=0).squeeze())
+            # squeeze(-1) removes only the trailing channel dim, preserving view dim when V=1
+            rendered_depths.append(torch.cat(rendering_depth_list, dim=0).squeeze(-1))
             rendered_imgs.append(torch.cat(rendering_list, dim=0))
-            rendered_alphas.append(torch.cat(rendering_alpha_list, dim=0).squeeze())
+            rendered_alphas.append(torch.cat(rendering_alpha_list, dim=0).squeeze(-1))
         return DecoderOutput(
             torch.stack(rendered_imgs),
             torch.stack(rendered_depths),
