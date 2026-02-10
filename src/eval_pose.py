@@ -1,24 +1,30 @@
+import argparse
+import gzip
+import json
 import os
 import sys
-import json
-import gzip
-import argparse
-import numpy as np
-from PIL import Image
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torchvision
 from einops import rearrange
 from lpips import LPIPS
+from PIL import Image
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.model.model.anysplat import AnySplat
-from src.model.encoder.vggt.utils.pose_enc import pose_encoding_to_extri_intri
+from src.misc.cam_utils import rotation_6d_to_matrix
 from src.model.encoder.vggt.utils.load_fn import load_and_preprocess_images
-from src.utils.pose import align_to_first_camera, calculate_auc_np, convert_pt3d_RT_to_opencv, se3_to_relative_pose_error
-from src.misc.cam_utils import camera_normalization, pose_auc, rotation_6d_to_matrix, update_pose, get_pnp_pose
+from src.model.encoder.vggt.utils.pose_enc import pose_encoding_to_extri_intri
+from src.model.model.anysplat import AnySplat
+from src.utils.pose import (
+    align_to_first_camera,
+    calculate_auc_np,
+    convert_pt3d_RT_to_opencv,
+    se3_to_relative_pose_error,
+)
+
 
 def setup_args():
     """Set up command-line arguments for the CO3D evaluation script."""
@@ -63,7 +69,7 @@ def process_sequence(model, seq_name, seq_data, category, co3d_dir, min_num_imag
     """
     if len(seq_data) < min_num_images:
         return None, None
-    
+
     metadata = []
     for data in seq_data:
         # Make sure translations are not ridiculous
@@ -80,12 +86,12 @@ def process_sequence(model, seq_name, seq_data, category, co3d_dir, min_num_imag
     image_names = [os.path.join(co3d_dir, metadata[i]["filepath"]) for i in ids]
     gt_extri = [np.array(metadata[i]["extri"]) for i in ids]
     gt_extri = np.stack(gt_extri, axis=0)
-    
+
     max_size = max(Image.open(image_names[0]).size)
     if max_size < 448:
         return None, None
     images = load_and_preprocess_images(image_names)[None].to(device)
-    
+
     batch = {
         "context": {
             "image": images*2.0-1,
@@ -94,7 +100,7 @@ def process_sequence(model, seq_name, seq_data, category, co3d_dir, min_num_imag
         },
         "scene": "co3d"
     }
-    
+
     if use_ba:
         try:
             encoder_output = model.encoder(
@@ -158,7 +164,7 @@ def process_sequence(model, seq_name, seq_data, category, co3d_dir, min_num_imag
 
                     rendering_loss.backward()
                     pose_optimizer.step()
-                torchvision.utils.save_image(images[0], f"outputs/vis/gt_co3d.png")
+                torchvision.utils.save_image(images[0], "outputs/vis/gt_co3d.png")
                 pred_extrinsic = new_extrinsics.inverse()[0][:,:-1,:]
 
         except Exception as e:
@@ -216,41 +222,41 @@ def evaluate(args: argparse.Namespace):
         "teddybear", "toaster", "toilet", "toybus", "toyplane",
         "toytrain", "toytruck", "tv", "umbrella", "vase", "wineglass",
     ]
-    
+
     if args.debug:
         SEEN_CATEGORIES = ["apple"]
-    
+
     per_category_results = {}
 
     for category in SEEN_CATEGORIES:
         print(f"Loading annotation for {category} test set")
         annotation_file = os.path.join(args.co3d_anno_dir, f"{category}_test.jgz")
-        
+
         try:
             with gzip.open(annotation_file, "r") as fin:
                 annotation = json.loads(fin.read())
         except FileNotFoundError:
             print(f"Annotation file not found for {category}, skipping")
             continue
-        
+
         rError = []
         tError = []
 
         for seq_name, seq_data in annotation.items():
             print("-" * 50)
-            
+
             print(f"Processing {seq_name} for {category} test set")
             if args.debug and not os.path.exists(os.path.join(args.co3d_dir, category, seq_name)):
                 print(f"Skipping {seq_name} (not found)")
                 continue
-            
+
             seq_rError, seq_tError = process_sequence(
-                model, seq_name, seq_data, category, args.co3d_dir, 
+                model, seq_name, seq_data, category, args.co3d_dir,
                 args.min_num_images, args.num_frames, args.use_ba, device, torch.bfloat16
             )
-            
+
             print("-" * 50)
-            
+
             if seq_rError is not None and seq_tError is not None:
                 rError.extend(seq_rError)
                 tError.extend(seq_tError)
@@ -261,18 +267,18 @@ def evaluate(args: argparse.Namespace):
 
         rError = np.array(rError)
         tError = np.array(tError)
-        
+
         thresholds = [5, 10, 20, 30]
         Aucs = {}
-        
+
         for threshold in thresholds:
             Auc, _ = calculate_auc_np(rError, tError, max_threshold=threshold)
             Aucs[threshold] = Auc
-        
+
         print("="*80)
         print(f"AUC of {category} test set: {Aucs[30]:.4f}")
         print("="*80)
-        
+
         per_category_results[category] = {
             "rError": rError,
             "tError": tError,
@@ -301,7 +307,7 @@ def evaluate(args: argparse.Namespace):
         print(f"Mean AUC_30: {mean_AUC_30:.4f}")
         print(f"Mean AUC_20: {mean_AUC_20:.4f}")
         print(f"Mean AUC_10: {mean_AUC_10:.4f}")
-    
+
     # Generate a random index to avoid overwriting previous results
     # random_index = torch.randint(0, 10000, (1,)).item()
     # Use timestamp as index instead of random number
@@ -313,7 +319,7 @@ def evaluate(args: argparse.Namespace):
     with open(results_file, "w") as f:
         f.write("CO3D Evaluation Results\n")
         f.write("=" * 50 + "\n\n")
-        
+
         f.write("Per-category results:\n")
         f.write("-" * 50 + "\n")
         for category in sorted(per_category_results.keys()):
@@ -322,7 +328,7 @@ def evaluate(args: argparse.Namespace):
             f.write(f"{category:<15} AUC_10: {per_category_results[category]['Auc_10']:.4f}\n")
             f.write(f"{category:<15} AUC_5: {per_category_results[category]['Auc_5']:.4f}\n")
             f.write("\n")
-        
+
         if per_category_results:
             f.write("-" * 50 + "\n")
             f.write(f"Mean AUC_30: {mean_AUC_30:.4f}\n")
@@ -330,7 +336,7 @@ def evaluate(args: argparse.Namespace):
             f.write(f"Mean AUC_10: {mean_AUC_10:.4f}\n")
             f.write(f"Mean AUC_5: {mean_AUC_5:.4f}\n")
         f.write("\n" + "=" * 50 + "\n")
-    
+
     print(f"Results saved to {results_file}")
 
 
