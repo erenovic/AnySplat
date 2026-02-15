@@ -69,12 +69,14 @@ class Aggregator(nn.Module):
     ):
         super().__init__()
         self.use_checkpoint = True
-        self.__build_patch_embed__(patch_embed, img_size, patch_size, num_register_tokens, embed_dim=embed_dim)
+        self.__build_patch_embed__(
+            patch_embed, img_size, patch_size, num_register_tokens, embed_dim=embed_dim
+        )
 
         # Initialize rotary position embedding if frequency > 0
         self.rope = RotaryPositionEmbedding2D(frequency=rope_freq) if rope_freq > 0 else None
         self.position_getter = PositionGetter() if self.rope is not None else None
-        
+
         self.frame_blocks = nn.ModuleList(
             [
                 block_fn(
@@ -142,7 +144,7 @@ class Aggregator(nn.Module):
                 torch.FloatTensor(value).view(1, 1, 3, 1, 1),
                 persistent=False,
             )
-    
+
     def __build_patch_embed__(
         self,
         patch_embed,
@@ -159,9 +161,11 @@ class Aggregator(nn.Module):
         Build the patch embed layer. If 'conv', we use a
         simple PatchEmbed conv layer. Otherwise, we use a vision transformer.
         """
-        
+
         if "conv" in patch_embed:
-            self.patch_embed = PatchEmbed(img_size=img_size, patch_size=patch_size, in_chans=3, embed_dim=embed_dim)
+            self.patch_embed = PatchEmbed(
+                img_size=img_size, patch_size=patch_size, in_chans=3, embed_dim=embed_dim
+            )
         else:
             vit_models = {
                 "dinov2_vitl14_reg": vit_large,
@@ -185,9 +189,7 @@ class Aggregator(nn.Module):
                 self.patch_embed.mask_token.requires_grad_(False)
 
     def forward(
-        self,
-        images: torch.Tensor,
-        intermediate_layer_idx: Optional[List[int]] = None
+        self, images: torch.Tensor, intermediate_layer_idx: Optional[List[int]] = None
     ) -> Tuple[List[torch.Tensor], int]:
         """
         Args:
@@ -203,7 +205,7 @@ class Aggregator(nn.Module):
 
         if C_in != 3:
             raise ValueError(f"Expected 3 input channels, got {C_in}")
-        
+
         # Normalize images and reshape for patch embed
         images = (images - self._resnet_mean) / self._resnet_std
 
@@ -225,7 +227,9 @@ class Aggregator(nn.Module):
 
         pos = None
         if self.rope is not None:
-            pos = self.position_getter(B * S, H // self.patch_size, W // self.patch_size, device=images.device)
+            pos = self.position_getter(
+                B * S, H // self.patch_size, W // self.patch_size, device=images.device
+            )
 
         if self.patch_start_idx > 0:
             # do not use position embedding for special tokens (camera and register tokens)
@@ -241,7 +245,7 @@ class Aggregator(nn.Module):
         global_idx = 0
         output_list = []
         layer_idx = 0
-        
+
         # Convert intermediate_layer_idx to a set for O(1) lookup
         if intermediate_layer_idx is not None:
             required_layers = set(intermediate_layer_idx)
@@ -269,13 +273,13 @@ class Aggregator(nn.Module):
                         concat_inter = torch.cat([frame_intermediates[i], global_intermediates[i]], dim=-1)
                         output_list.append(concat_inter)
                 layer_idx += self.aa_block_size
-            
+
             else:
                 for i in range(len(frame_intermediates)):
                     # concat frame and global intermediates, [B x S x P x 2C]
                     concat_inter = torch.cat([frame_intermediates[i], global_intermediates[i]], dim=-1)
                     output_list.append(concat_inter)
-        
+
         del concat_inter
         del frame_intermediates
         del global_intermediates
@@ -293,7 +297,7 @@ class Aggregator(nn.Module):
             pos = pos.view(B, S, P, 2).view(B * S, P, 2)
 
         intermediates = []
-        
+
         # by default, self.aa_block_size=1, which processes one block at a time
         for _ in range(self.aa_block_size):
             if self.use_checkpoint:
@@ -321,7 +325,7 @@ class Aggregator(nn.Module):
             pos = pos.view(B, S, P, 2).view(B, S * P, 2)
 
         intermediates = []
-        
+
         # by default, self.aa_block_size=1, which processes one block at a time
         for _ in range(self.aa_block_size):
             if self.use_checkpoint:

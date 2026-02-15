@@ -79,10 +79,7 @@ def separate_loss_cfg_wrappers(joined: dict) -> list[LossCfgWrapper]:
     class Dummy:
         dummy: LossCfgWrapper
 
-    return [
-        load_typed_config(DictConfig({"dummy": {k: v}}), Dummy).dummy
-        for k, v in joined.items()
-    ]
+    return [load_typed_config(DictConfig({"dummy": {k: v}}), Dummy).dummy for k, v in joined.items()]
 
 
 def separate_dataset_cfg_wrappers(joined: dict) -> list[DatasetCfgWrapper]:
@@ -91,16 +88,15 @@ def separate_dataset_cfg_wrappers(joined: dict) -> list[DatasetCfgWrapper]:
     class Dummy:
         dummy: DatasetCfgWrapper
 
-    return [
-        load_typed_config(DictConfig({"dummy": {k: v}}), Dummy).dummy
-        for k, v in joined.items()
-    ]
+    return [load_typed_config(DictConfig({"dummy": {k: v}}), Dummy).dummy for k, v in joined.items()]
 
 
 def load_typed_root_config(cfg: DictConfig) -> RootCfg:
     return load_typed_config(
         cfg,
         RootCfg,
-        {list[LossCfgWrapper]: separate_loss_cfg_wrappers,
-         list[DatasetCfgWrapper]: separate_dataset_cfg_wrappers},
+        {
+            list[LossCfgWrapper]: separate_loss_cfg_wrappers,
+            list[DatasetCfgWrapper]: separate_dataset_cfg_wrappers,
+        },
     )

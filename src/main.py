@@ -16,11 +16,13 @@ from omegaconf import DictConfig, OmegaConf
 from hydra.core.hydra_config import HydraConfig
 
 import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.model.model import get_model
 from src.misc.weight_modify import checkpoint_filter_fn
 
 import warnings
+
 warnings.filterwarnings("ignore")
 
 # Configure beartype and jaxtyping.
@@ -52,16 +54,14 @@ def cyan(text: str) -> str:
 def train(cfg_dict: DictConfig):
     cfg = load_typed_root_config(cfg_dict)
     set_cfg(cfg_dict)
-    
+
     # Set up the output directory.
-    output_dir = Path(
-        hydra.core.hydra_config.HydraConfig.get()["runtime"]["output_dir"]
-    )
+    output_dir = Path(hydra.core.hydra_config.HydraConfig.get()["runtime"]["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
     print(cyan(f"Saving outputs to {output_dir}."))
-    
+
     cfg.train.output_path = output_dir
-    
+
     # Set up logging with wandb.
     callbacks = []
     if cfg_dict.wandb.mode != "disabled":
@@ -75,13 +75,13 @@ def train(cfg_dict: DictConfig):
             config=OmegaConf.to_container(cfg_dict),
         )
         callbacks.append(LearningRateMonitor("step", True))
-        
+
         # On rank != 0, wandb.run is None.
         if wandb.run is not None:
             wandb.run.log_code("src")
     else:
         logger = LocalLogger()
-    
+
     # Set up checkpointing.
     callbacks.append(
         ModelCheckpoint(
@@ -93,14 +93,14 @@ def train(cfg_dict: DictConfig):
             mode="max",
         )
     )
-    callbacks[-1].CHECKPOINT_EQUALS_CHAR = '_'
-    
+    callbacks[-1].CHECKPOINT_EQUALS_CHAR = "_"
+
     # Prepare the checkpoint for loading.
     checkpoint_path = update_checkpoint_path(cfg.checkpointing.load, cfg.wandb)
-    
+
     # This allows the current step to be shared with the data loader processes.
     step_tracker = StepTracker()
-    
+
     trainer = Trainer(
         max_epochs=-1,
         num_nodes=cfg.trainer.num_nodes,
@@ -108,11 +108,7 @@ def train(cfg_dict: DictConfig):
         accelerator="gpu",
         logger=logger,
         devices="auto",
-        strategy=(
-            "ddp_find_unused_parameters_true"
-            if torch.cuda.device_count() > 1
-            else "auto"
-        ),
+        strategy=("ddp_find_unused_parameters_true" if torch.cuda.device_count() > 1 else "auto"),
         # strategy="deepspeed_stage_1",
         callbacks=callbacks,
         val_check_interval=cfg.trainer.val_check_interval,
@@ -126,16 +122,11 @@ def train(cfg_dict: DictConfig):
         inference_mode=False if (cfg.mode == "test" and cfg.test.align_pose) else True,
     )
     torch.manual_seed(cfg_dict.seed + trainer.global_rank)
-    
+
     model = get_model(cfg.model.encoder, cfg.model.decoder)
-    
+
     model_wrapper = ModelWrapper(
-        cfg.optimizer,
-        cfg.test,
-        cfg.train,
-        model,
-        get_losses(cfg.loss),
-        step_tracker
+        cfg.optimizer, cfg.test, cfg.train, model, get_losses(cfg.loss), step_tracker
     )
     data_module = DataModule(
         cfg.dataset,
@@ -143,7 +134,7 @@ def train(cfg_dict: DictConfig):
         step_tracker,
         global_rank=trainer.global_rank,
     )
-    
+
     if cfg.mode == "train":
         trainer.fit(model_wrapper, datamodule=data_module, ckpt_path=checkpoint_path)
     else:

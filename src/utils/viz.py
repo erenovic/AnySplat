@@ -56,13 +56,9 @@ def pts3d_to_trimesh(img, pts3d, valid=None):
     faces = np.concatenate(
         (
             np.c_[idx1, idx2, idx3],
-            np.c_[
-                idx3, idx2, idx1
-            ],  # same triangle, but backward (cheap solution to cancel face culling)
+            np.c_[idx3, idx2, idx1],  # same triangle, but backward (cheap solution to cancel face culling)
             np.c_[idx2, idx3, idx4],
-            np.c_[
-                idx4, idx3, idx2
-            ],  # same triangle, but backward (cheap solution to cancel face culling)
+            np.c_[idx4, idx3, idx2],  # same triangle, but backward (cheap solution to cancel face culling)
         ),
         axis=0,
     )
@@ -91,9 +87,7 @@ def pts3d_to_trimesh(img, pts3d, valid=None):
 
 
 def cat_meshes(meshes):
-    vertices, faces, colors = zip(
-        *[(m["vertices"], m["faces"], m["face_colors"]) for m in meshes]
-    )
+    vertices, faces, colors = zip(*[(m["vertices"], m["faces"], m["face_colors"]) for m in meshes])
     n_vertices = np.cumsum([0] + [len(v) for v in vertices])
     for i in range(len(faces)):
         faces[i][:] += n_vertices[i]
@@ -171,9 +165,7 @@ class SceneViz:
         add_scene_cam(self.scene, pose_c2w, color, image, focal, screen_width=cam_size)
         return self
 
-    def add_cameras(
-        self, poses, focals=None, images=None, imsizes=None, colors=None, **kw
-    ):
+    def add_cameras(self, poses, focals=None, images=None, imsizes=None, colors=None, **kw):
         def get(arr, idx):
             return None if arr is None else arr[idx]
 
@@ -233,9 +225,7 @@ def show_raw_pointcloud_with_cams(
     scene.show(line_settings={"point_size": point_size})
 
 
-def add_scene_cam(
-    scene, pose_c2w, edge_color, image=None, focal=None, imsize=None, screen_width=0.03
-):
+def add_scene_cam(scene, pose_c2w, edge_color, image=None, focal=None, imsize=None, screen_width=0.03):
     if image is not None:
         H, W, THREE = image.shape
         assert THREE == 3
@@ -270,9 +260,7 @@ def add_scene_cam(
         faces = np.array([[0, 1, 2], [0, 2, 3], [2, 1, 0], [3, 2, 0]])
         img = trimesh.Trimesh(vertices=vertices, faces=faces)
         uv_coords = np.float32([[0, 0], [1, 0], [1, 1], [0, 1]])
-        img.visual = trimesh.visual.TextureVisuals(
-            uv_coords, image=PIL.Image.fromarray(image)
-        )
+        img.visual = trimesh.visual.TextureVisuals(uv_coords, image=PIL.Image.fromarray(image))
         scene.add_geometry(img)
 
     # this is the camera mesh
@@ -361,9 +349,7 @@ def segment_sky(image):
     mask2 = ndimage.binary_opening(mask, structure=kernel)
 
     # keep only largest CC
-    _, labels, stats, _ = cv2.connectedComponentsWithStats(
-        mask2.view(np.uint8), connectivity=8
-    )
+    _, labels, stats, _ = cv2.connectedComponentsWithStats(mask2.view(np.uint8), connectivity=8)
     cc_sizes = stats[1:, cv2.CC_STAT_AREA]
     order = cc_sizes.argsort()[::-1]  # bigger first
     i = 0

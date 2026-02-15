@@ -8,6 +8,7 @@ from .loss_lod import LossLOD, LossLODCfgWrapper
 from .loss_depth_consis import LossDepthConsis, LossDepthConsisCfgWrapper
 from .loss_normal_consis import LossNormalConsis, LossNormalConsisCfgWrapper
 from .loss_chamfer_distance import LossChamferDistance, LossChamferDistanceCfgWrapper
+
 LOSSES = {
     LossDepthCfgWrapper: LossDepth,
     LossLpipsCfgWrapper: LossLpips,
@@ -20,7 +21,18 @@ LOSSES = {
     LossChamferDistanceCfgWrapper: LossChamferDistance,
 }
 
-LossCfgWrapper = LossDepthCfgWrapper | LossLpipsCfgWrapper | LossMseCfgWrapper | LossOpacityCfgWrapper | LossDepthGTCfgWrapper | LossLODCfgWrapper | LossDepthConsisCfgWrapper | LossNormalConsisCfgWrapper | LossChamferDistanceCfgWrapper
+LossCfgWrapper = (
+    LossDepthCfgWrapper
+    | LossLpipsCfgWrapper
+    | LossMseCfgWrapper
+    | LossOpacityCfgWrapper
+    | LossDepthGTCfgWrapper
+    | LossLODCfgWrapper
+    | LossDepthConsisCfgWrapper
+    | LossNormalConsisCfgWrapper
+    | LossChamferDistanceCfgWrapper
+)
+
 
 def get_losses(cfgs: list[LossCfgWrapper]) -> list[Loss]:
     return [LOSSES[type(cfg)](cfg) for cfg in cfgs]

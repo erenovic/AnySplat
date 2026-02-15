@@ -37,8 +37,5 @@ def build_covariance(
     scale = scale.diag_embed()
     rotation = quaternion_to_matrix(rotation_xyzw)
     return (
-        rotation
-        @ scale
-        @ rearrange(scale, "... i j -> ... j i")
-        @ rearrange(rotation, "... i j -> ... j i")
+        rotation @ scale @ rearrange(scale, "... i j -> ... j i") @ rearrange(rotation, "... i j -> ... j i")
     )

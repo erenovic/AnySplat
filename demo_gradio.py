@@ -27,10 +27,7 @@ from src.utils.image import process_image
 def get_reconstructed_scene(outdir, model, device):
     # Load Images
     image_files = sorted(
-        [
-            os.path.join(outdir, "images", f)
-            for f in os.listdir(os.path.join(outdir, "images"))
-        ]
+        [os.path.join(outdir, "images", f) for f in os.listdir(os.path.join(outdir, "images"))]
     )
     images = [process_image(img_path) for img_path in image_files]
     images = torch.stack(images, dim=0).unsqueeze(0).to(device)  # [1, K, 3, 448, 448]
@@ -124,9 +121,7 @@ def handle_uploads(input_video, input_images):
                 break
             count += 1
             if count % frame_interval == 0:
-                image_path = os.path.join(
-                    target_dir_images, f"{video_frame_num:06}.png"
-                )
+                image_path = os.path.join(target_dir_images, f"{video_frame_num:06}.png")
                 cv2.imwrite(image_path, frame)
                 image_paths.append(image_path)
                 video_frame_num += 1
@@ -135,9 +130,7 @@ def handle_uploads(input_video, input_images):
     image_paths = sorted(image_paths)
 
     end_time = time.time()
-    print(
-        f"Files copied to {target_dir_images}; took {end_time - start_time:.3f} seconds"
-    )
+    print(f"Files copied to {target_dir_images}; took {end_time - start_time:.3f} seconds")
     return target_dir, image_paths
 
 
@@ -167,21 +160,15 @@ def gradio_demo(
     start_time = time.time()
     gc.collect()
     torch.cuda.empty_cache()
-    
+
     # Prepare frame_filter dropdown
     target_dir_images = os.path.join(target_dir, "images")
-    all_files = (
-        sorted(os.listdir(target_dir_images))
-        if os.path.isdir(target_dir_images)
-        else []
-    )
+    all_files = sorted(os.listdir(target_dir_images)) if os.path.isdir(target_dir_images) else []
     all_files = [f"{i}: {filename}" for i, filename in enumerate(all_files)]
 
     print("Running run_model...")
     with torch.no_grad():
-        plyfile, video, depth_colored = get_reconstructed_scene(
-            target_dir, model, device
-        )
+        plyfile, video, depth_colored = get_reconstructed_scene(target_dir, model, device)
 
     end_time = time.time()
     print(f"Total time: {end_time - start_time:.2f} seconds (including IO)")
@@ -201,11 +188,9 @@ if __name__ == "__main__":
     server_port = None
     share = True
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
+
     # Load model
-    model = AnySplat.from_pretrained(
-        "lhjiang/anysplat"
-    )
+    model = AnySplat.from_pretrained("lhjiang/anysplat")
     model = model.to(device)
     model.eval()
     for param in model.parameters():
@@ -336,9 +321,7 @@ if __name__ == "__main__":
 
                         with gr.Row():
                             with gr.Row():
-                                rgb_video = gr.Video(
-                                    label="RGB Video", interactive=False, autoplay=True
-                                )
+                                rgb_video = gr.Video(label="RGB Video", interactive=False, autoplay=True)
                                 depth_video = gr.Video(
                                     label="Depth Video",
                                     interactive=False,
@@ -346,9 +329,7 @@ if __name__ == "__main__":
                                 )
 
                         with gr.Row():
-                            submit_btn = gr.Button(
-                                "Reconstruct", scale=1, variant="primary"
-                            )
+                            submit_btn = gr.Button("Reconstruct", scale=1, variant="primary")
                             clear_btn = gr.ClearButton(
                                 [
                                     input_video,
@@ -365,21 +346,141 @@ if __name__ == "__main__":
         # ---------------------- Examples section ----------------------
 
         examples = [
-            [None, "examples/video/re10k_1eca36ec55b88fe4.mp4", "re10k", "1eca36ec55b88fe4", "2", "Real", "True",],
-            [None, "examples/video/bungeenerf_colosseum.mp4", "bungeenerf", "colosseum", "8", "Synthetic", "True",],
-            [None, "examples/video/fox.mp4", "InstantNGP", "fox", "14", "Real", "True",],
-            [None, "examples/video/matrixcity_street.mp4", "matrixcity", "street", "32", "Synthetic", "True",],
-            [None, "examples/video/vrnerf_apartment.mp4", "vrnerf", "apartment", "32", "Real", "True",],
-            [None, "examples/video/vrnerf_kitchen.mp4", "vrnerf", "kitchen", "17", "Real", "True",],
-            [None, "examples/video/vrnerf_riverview.mp4", "vrnerf", "riverview", "12", "Real", "True",],
-            [None, "examples/video/vrnerf_workshop.mp4", "vrnerf", "workshop", "32", "Real", "True",],
-            [None, "examples/video/fillerbuster_ramen.mp4", "fillerbuster", "ramen", "32", "Real", "True",],
-            [None, "examples/video/meganerf_rubble.mp4", "meganerf", "rubble", "10", "Real", "True",],
-            [None, "examples/video/llff_horns.mp4", "llff", "horns", "12", "Real", "True",],
-            [None, "examples/video/llff_fortress.mp4", "llff", "fortress", "7", "Real", "True",],
-            [None, "examples/video/dtu_scan_106.mp4", "dtu", "scan_106", "20", "Real", "True",],
-            [None, "examples/video/horizongs_hillside_summer.mp4", "horizongs", "hillside_summer", "55", "Synthetic", "True",],
-            [None, "examples/video/kitti360.mp4", "kitti360", "kitti360", "64", "Real", "True",],
+            [
+                None,
+                "examples/video/re10k_1eca36ec55b88fe4.mp4",
+                "re10k",
+                "1eca36ec55b88fe4",
+                "2",
+                "Real",
+                "True",
+            ],
+            [
+                None,
+                "examples/video/bungeenerf_colosseum.mp4",
+                "bungeenerf",
+                "colosseum",
+                "8",
+                "Synthetic",
+                "True",
+            ],
+            [
+                None,
+                "examples/video/fox.mp4",
+                "InstantNGP",
+                "fox",
+                "14",
+                "Real",
+                "True",
+            ],
+            [
+                None,
+                "examples/video/matrixcity_street.mp4",
+                "matrixcity",
+                "street",
+                "32",
+                "Synthetic",
+                "True",
+            ],
+            [
+                None,
+                "examples/video/vrnerf_apartment.mp4",
+                "vrnerf",
+                "apartment",
+                "32",
+                "Real",
+                "True",
+            ],
+            [
+                None,
+                "examples/video/vrnerf_kitchen.mp4",
+                "vrnerf",
+                "kitchen",
+                "17",
+                "Real",
+                "True",
+            ],
+            [
+                None,
+                "examples/video/vrnerf_riverview.mp4",
+                "vrnerf",
+                "riverview",
+                "12",
+                "Real",
+                "True",
+            ],
+            [
+                None,
+                "examples/video/vrnerf_workshop.mp4",
+                "vrnerf",
+                "workshop",
+                "32",
+                "Real",
+                "True",
+            ],
+            [
+                None,
+                "examples/video/fillerbuster_ramen.mp4",
+                "fillerbuster",
+                "ramen",
+                "32",
+                "Real",
+                "True",
+            ],
+            [
+                None,
+                "examples/video/meganerf_rubble.mp4",
+                "meganerf",
+                "rubble",
+                "10",
+                "Real",
+                "True",
+            ],
+            [
+                None,
+                "examples/video/llff_horns.mp4",
+                "llff",
+                "horns",
+                "12",
+                "Real",
+                "True",
+            ],
+            [
+                None,
+                "examples/video/llff_fortress.mp4",
+                "llff",
+                "fortress",
+                "7",
+                "Real",
+                "True",
+            ],
+            [
+                None,
+                "examples/video/dtu_scan_106.mp4",
+                "dtu",
+                "scan_106",
+                "20",
+                "Real",
+                "True",
+            ],
+            [
+                None,
+                "examples/video/horizongs_hillside_summer.mp4",
+                "horizongs",
+                "hillside_summer",
+                "55",
+                "Synthetic",
+                "True",
+            ],
+            [
+                None,
+                "examples/video/kitti360.mp4",
+                "kitti360",
+                "kitti360",
+                "64",
+                "Real",
+                "True",
+            ],
         ]
 
         def example_pipeline(
@@ -426,7 +527,9 @@ if __name__ == "__main__":
             examples_per_page=50,
         )
 
-        gr.Markdown("<p style='text-align: center; font-style: italic; color: #666;'>We thank VGGT for their excellent gradio implementation!</p>")
+        gr.Markdown(
+            "<p style='text-align: center; font-style: italic; color: #666;'>We thank VGGT for their excellent gradio implementation!</p>"
+        )
 
         submit_btn.click(
             fn=clear_fields,
@@ -438,9 +541,7 @@ if __name__ == "__main__":
                 target_dir_output,
             ],
             outputs=[reconstruction_output, rgb_video, depth_video],
-        ).then(
-            fn=lambda: "False", inputs=[], outputs=[is_example]
-        )
+        ).then(fn=lambda: "False", inputs=[], outputs=[is_example])
 
         input_video.change(
             fn=update_gallery_on_upload,

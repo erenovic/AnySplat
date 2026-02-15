@@ -35,7 +35,7 @@ class LossLpips(Loss[LossLpipsCfg, LossLpipsCfgWrapper]):
 
         self.lpips = LPIPS(net="vgg")
         convert_to_buffer(self.lpips, persistent=False)
-        
+
     def forward(
         self,
         prediction: DecoderOutput,
@@ -45,23 +45,23 @@ class LossLpips(Loss[LossLpipsCfg, LossLpipsCfgWrapper]):
         global_step: int,
     ) -> Float[Tensor, ""]:
         image = (batch["context"]["image"] + 1) / 2
-        
+
         # Before the specified step, don't apply the loss.
         if global_step < self.cfg.apply_after_step:
             return torch.tensor(0, dtype=torch.float32, device=image.device)
-        
+
         if self.cfg.mask or self.cfg.alpha or self.cfg.conf:
             if self.cfg.mask:
                 mask = batch["context"]["valid_mask"]
             elif self.cfg.alpha:
                 mask = prediction.alpha
             elif self.cfg.conf:
-                mask = depth_dict['conf_valid_mask']
+                mask = depth_dict["conf_valid_mask"]
             b, v, c, h, w = prediction.color.shape
             expanded_mask = mask.unsqueeze(2).expand(-1, -1, c, -1, -1)
             masked_pred = prediction.color * expanded_mask
             masked_img = image * expanded_mask
-            
+
             loss = self.lpips.forward(
                 rearrange(masked_pred, "b v c h w -> (b v) c h w"),
                 rearrange(masked_img, "b v c h w -> (b v) c h w"),

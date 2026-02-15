@@ -281,9 +281,7 @@ class EncoderAnySplat(Encoder[EncoderAnySplatCfg]):
 
         # Aggregate per voxel
         voxel_pts = scatter_add(weighted_pts, inverse_indices, dim=0)  # [num_unique_voxels, 3]
-        voxel_feats = scatter_add(
-            weighted_feats, inverse_indices, dim=0
-        )  # [num_unique_voxels, feat_dim]
+        voxel_feats = scatter_add(weighted_feats, inverse_indices, dim=0)  # [num_unique_voxels, feat_dim]
 
         return voxel_pts, voxel_feats
 
@@ -309,19 +307,15 @@ class EncoderAnySplat(Encoder[EncoderAnySplatCfg]):
             with torch.no_grad():
                 # Process with bfloat16 precision
                 with torch.amp.autocast("cuda", enabled=True, dtype=torch.bfloat16):
-                    distill_aggregated_tokens_list, distill_patch_start_idx = (
-                        self.distill_aggregator(
-                            distill_image.to(torch.bfloat16),
-                            intermediate_layer_idx=self.cfg.intermediate_layer_idx,
-                        )
+                    distill_aggregated_tokens_list, distill_patch_start_idx = self.distill_aggregator(
+                        distill_image.to(torch.bfloat16),
+                        intermediate_layer_idx=self.cfg.intermediate_layer_idx,
                     )
 
                 # Process with default precision
                 with torch.amp.autocast("cuda", enabled=False):
                     # Get camera pose information
-                    distill_pred_pose_enc_list = self.distill_camera_head(
-                        distill_aggregated_tokens_list
-                    )
+                    distill_pred_pose_enc_list = self.distill_camera_head(distill_aggregated_tokens_list)
                     last_distill_pred_pose_enc = distill_pred_pose_enc_list[-1]
                     distill_extrinsic, distill_intrinsic = pose_encoding_to_extri_intri(
                         last_distill_pred_pose_enc, image.shape[-2:]
@@ -428,17 +422,13 @@ class EncoderAnySplat(Encoder[EncoderAnySplatCfg]):
                 neural_pts_list.append(neural_pts)
         else:
             for b_i in range(b):
-                neural_feats_list.append(
-                    anchor_feats[b_i].permute(0, 2, 3, 1)[conf_valid_mask[b_i]]
-                )
+                neural_feats_list.append(anchor_feats[b_i].permute(0, 2, 3, 1)[conf_valid_mask[b_i]])
                 neural_pts_list.append(pts_all[b_i][conf_valid_mask[b_i]])
 
         max_voxels = max(f.shape[0] for f in neural_feats_list)
         neural_feats = self.pad_tensor_list(neural_feats_list, (max_voxels,), value=-1e10)
 
-        neural_pts = self.pad_tensor_list(
-            neural_pts_list, (max_voxels,), -1e4
-        )  # -1 == invalid voxel
+        neural_pts = self.pad_tensor_list(neural_pts_list, (max_voxels,), -1e4)  # -1 == invalid voxel
 
         depths = neural_pts[..., -1].unsqueeze(-1)
         densities = neural_feats[..., 0].sigmoid()
@@ -516,9 +506,7 @@ class EncoderAnySplat(Encoder[EncoderAnySplatCfg]):
             .repeat(b, v, 1, 1)
         )
         intrinsic = intrinsic.clone()  # Create a new tensor
-        intrinsic = torch.stack(
-            [intrinsic[:, :, 0] / w, intrinsic[:, :, 1] / h, intrinsic[:, :, 2]], dim=2
-        )
+        intrinsic = torch.stack([intrinsic[:, :, 0] / w, intrinsic[:, :, 1] / h, intrinsic[:, :, 2]], dim=2)
 
         return EncoderOutput(
             gaussians=gaussians,

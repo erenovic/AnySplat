@@ -38,9 +38,7 @@ def part1by2_vec(x: torch.Tensor) -> torch.Tensor:
     return x
 
 
-def encode_morton3_vec(
-    x: torch.Tensor, y: torch.Tensor, z: torch.Tensor
-) -> torch.Tensor:
+def encode_morton3_vec(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     """Compute Morton codes for 3D coordinates
 
     Args:
@@ -121,9 +119,7 @@ def pack_111011(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tens
     return packed_x | packed_y | packed_z
 
 
-def pack_8888(
-    x: torch.Tensor, y: torch.Tensor, z: torch.Tensor, w: torch.Tensor
-) -> torch.Tensor:
+def pack_8888(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
     """Pack four floating point values into a 32-bit integer with 8 bits each.
 
     Args:
@@ -347,15 +343,9 @@ def splat2ply_bytes_compressed(
     uint32_dtype = np.dtype(np.uint32).newbyteorder("<")
     uint8_dtype = np.dtype(np.uint8)
 
-    buffer.write(
-        torch.cat(chunk_data).detach().cpu().numpy().astype(float_dtype).tobytes()
-    )
-    buffer.write(
-        torch.cat(splat_data).detach().cpu().numpy().astype(uint32_dtype).tobytes()
-    )
-    buffer.write(
-        torch.cat(sh_data).detach().cpu().numpy().astype(uint8_dtype).tobytes()
-    )
+    buffer.write(torch.cat(chunk_data).detach().cpu().numpy().astype(float_dtype).tobytes())
+    buffer.write(torch.cat(splat_data).detach().cpu().numpy().astype(uint32_dtype).tobytes())
+    buffer.write(torch.cat(sh_data).detach().cpu().numpy().astype(uint8_dtype).tobytes())
 
     return buffer.getvalue()
 
@@ -384,7 +374,7 @@ def splat2ply_bytes(
 
     num_splats = means.shape[0]
     buffer = BytesIO()
-    
+
     # Write PLY header
     buffer.write(b"ply\n")
     buffer.write(b"format binary_little_endian 1.0\n")
@@ -404,9 +394,7 @@ def splat2ply_bytes(
     buffer.write(b"end_header\n")
 
     # Concatenate all tensors in the correct order
-    splat_data = torch.cat(
-        [means, sh0, shN, opacities.unsqueeze(1), scales, quats], dim=1
-    )
+    splat_data = torch.cat([means, sh0, shN, opacities.unsqueeze(1), scales, quats], dim=1)
     # Ensure correct dtype
     splat_data = splat_data.to(torch.float32)
 
@@ -504,10 +492,10 @@ def export_splats(
     assert quats.shape == (total_splats, 4), "Quaternions must be of shape (N, 4)"
     assert opacities.shape == (total_splats,), "Opacities must be of shape (N,)"
     assert sh0.shape == (total_splats, 1, 3), "sh0 must be of shape (N, 1, 3)"
-    assert (
-        shN.ndim == 3 and shN.shape[0] == total_splats and shN.shape[2] == 3
-    ), f"shN must be of shape (N, K, 3), got {shN.shape}"
-    
+    assert shN.ndim == 3 and shN.shape[0] == total_splats and shN.shape[2] == 3, (
+        f"shN must be of shape (N, K, 3), got {shN.shape}"
+    )
+
     # Reshape spherical harmonics
     sh0 = sh0.squeeze(1)  # Shape (N, 3)
     shN = shN.permute(0, 2, 1).reshape(means.shape[0], -1)  # Shape (N, K * 3)

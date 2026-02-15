@@ -95,9 +95,7 @@ class DataModule(LightningDataModule):
         return self.generator
 
     def train_dataloader(self):
-        dataset, datasets_ls = get_dataset(
-            self.dataset_cfgs, "train", self.step_tracker, self.dataset_shim
-        )
+        dataset, datasets_ls = get_dataset(self.dataset_cfgs, "train", self.step_tracker, self.dataset_shim)
         world_size = get_world_size()
         rank = get_rank()
         # breakpoint()
@@ -106,9 +104,7 @@ class DataModule(LightningDataModule):
 
         if len(datasets_ls) > 1:
             prob = prob_ls
-            context_num_views = [
-                dataset.cfg.view_sampler.num_context_views for dataset in datasets_ls
-            ]
+            context_num_views = [dataset.cfg.view_sampler.num_context_views for dataset in datasets_ls]
         else:
             prob = None
             dataset_key = next(iter(get_cfg()["dataset"]))
@@ -138,23 +134,17 @@ class DataModule(LightningDataModule):
         )
         # breakpoint()
         # Set epoch for train and validation loaders (if applicable)
-        if hasattr(self.train_loader, "dataset") and hasattr(
-            self.train_loader.dataset, "set_epoch"
-        ):
+        if hasattr(self.train_loader, "dataset") and hasattr(self.train_loader.dataset, "set_epoch"):
             print("Training: Set Epoch in DataModule")
             self.train_loader.dataset.set_epoch(0)
-        if hasattr(self.train_loader, "sampler") and hasattr(
-            self.train_loader.sampler, "set_epoch"
-        ):
+        if hasattr(self.train_loader, "sampler") and hasattr(self.train_loader.sampler, "set_epoch"):
             print("Training: Set Epoch in DataModule")
             self.train_loader.sampler.set_epoch(0)
 
         return self.train_loader
 
     def val_dataloader(self):
-        dataset, datasets_ls = get_dataset(
-            self.dataset_cfgs, "val", self.step_tracker, self.dataset_shim
-        )
+        dataset, datasets_ls = get_dataset(self.dataset_cfgs, "val", self.step_tracker, self.dataset_shim)
         world_size = get_world_size()
         rank = get_rank()
         # here, we random select one dataset for val

@@ -79,10 +79,16 @@ class EfficientUpdateFormer(nn.Module):
                 ]
             )
             self.space_point2virtual_blocks = nn.ModuleList(
-                [CrossAttnBlock(hidden_size, hidden_size, num_heads, mlp_ratio=mlp_ratio) for _ in range(space_depth)]
+                [
+                    CrossAttnBlock(hidden_size, hidden_size, num_heads, mlp_ratio=mlp_ratio)
+                    for _ in range(space_depth)
+                ]
             )
             self.space_virtual2point_blocks = nn.ModuleList(
-                [CrossAttnBlock(hidden_size, hidden_size, num_heads, mlp_ratio=mlp_ratio) for _ in range(space_depth)]
+                [
+                    CrossAttnBlock(hidden_size, hidden_size, num_heads, mlp_ratio=mlp_ratio)
+                    for _ in range(space_depth)
+                ]
             )
             assert len(self.time_blocks) >= len(self.space_virtual2point_blocks)
         self.initialize_weights()
@@ -120,7 +126,9 @@ class EfficientUpdateFormer(nn.Module):
 
             tokens = time_tokens.view(B, N, T, -1)  # (B N) T C -> B N T C
             if self.add_space_attn and (i % (len(self.time_blocks) // len(self.space_virtual_blocks)) == 0):
-                space_tokens = tokens.permute(0, 2, 1, 3).contiguous().view(B * T, N, -1)  # B N T C -> (B T) N C
+                space_tokens = (
+                    tokens.permute(0, 2, 1, 3).contiguous().view(B * T, N, -1)
+                )  # B N T C -> (B T) N C
                 point_tokens = space_tokens[:, : N - self.num_virtual_tracks]
                 virtual_tokens = space_tokens[:, N - self.num_virtual_tracks :]
 

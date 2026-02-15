@@ -184,17 +184,12 @@ def main(local_rank: int, world_rank, world_size: int, args):
             K[None],  # [1, 3, 3]
             width,
             height,
-            sh_degree=(
-                min(render_tab_state.max_sh_degree, sh_degree)
-                if sh_degree is not None
-                else None
-            ),
+            sh_degree=(min(render_tab_state.max_sh_degree, sh_degree) if sh_degree is not None else None),
             near_plane=render_tab_state.near_plane,
             far_plane=render_tab_state.far_plane,
             radius_clip=render_tab_state.radius_clip,
             eps2d=render_tab_state.eps2d,
-            backgrounds=torch.tensor([render_tab_state.backgrounds], device=device)
-            / 255.0,
+            backgrounds=torch.tensor([render_tab_state.backgrounds], device=device) / 255.0,
             render_mode=RENDER_MODE_MAP[render_tab_state.render_mode],
             rasterize_mode=render_tab_state.rasterize_mode,
             camera_model=render_tab_state.camera_model,
@@ -219,18 +214,12 @@ def main(local_rank: int, world_rank, world_size: int, args):
             depth_norm = torch.clip(depth_norm, 0, 1)
             if render_tab_state.inverse:
                 depth_norm = 1 - depth_norm
-            renders = (
-                apply_float_colormap(depth_norm, render_tab_state.colormap)
-                .cpu()
-                .numpy()
-            )
+            renders = apply_float_colormap(depth_norm, render_tab_state.colormap).cpu().numpy()
         elif render_tab_state.render_mode == "alpha":
             alpha = render_alphas[0, ..., 0:1]
             if render_tab_state.inverse:
                 alpha = 1 - alpha
-            renders = (
-                apply_float_colormap(alpha, render_tab_state.colormap).cpu().numpy()
-            )
+            renders = apply_float_colormap(alpha, render_tab_state.colormap).cpu().numpy()
         return renders
 
     server = viser.ViserServer(port=args.port, verbose=False)
@@ -257,18 +246,10 @@ if __name__ == "__main__":
         --port 8082
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--output_dir", type=str, default="results/", help="where to dump outputs"
-    )
-    parser.add_argument(
-        "--scene_grid", type=int, default=1, help="repeat the scene into a grid of NxN"
-    )
-    parser.add_argument(
-        "--ckpt", type=str, nargs="+", default=None, help="path to the .pt file"
-    )
-    parser.add_argument(
-        "--port", type=int, default=8080, help="port for the viewer server"
-    )
+    parser.add_argument("--output_dir", type=str, default="results/", help="where to dump outputs")
+    parser.add_argument("--scene_grid", type=int, default=1, help="repeat the scene into a grid of NxN")
+    parser.add_argument("--ckpt", type=str, nargs="+", default=None, help="path to the .pt file")
+    parser.add_argument("--port", type=int, default=8080, help="port for the viewer server")
     args = parser.parse_args()
     assert args.scene_grid % 2 == 1, "scene_grid must be odd"
 

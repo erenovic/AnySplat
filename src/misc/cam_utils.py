@@ -22,9 +22,7 @@ def compose_extrinsic_RT(RT: torch.Tensor):
     return torch.cat(
         [
             RT,
-            torch.tensor([[[0, 0, 0, 1]]], dtype=RT.dtype, device=RT.device).repeat(
-                RT.shape[0], 1, 1
-            ),
+            torch.tensor([[[0, 0, 0, 1]]], dtype=RT.dtype, device=RT.device).repeat(RT.shape[0], 1, 1),
         ],
         dim=1,
     )
@@ -101,11 +99,7 @@ def V(theta):
     if angle < 1e-5:
         V = I + 0.5 * W + (1.0 / 6.0) * W2
     else:
-        V = (
-            I
-            + W * ((1.0 - torch.cos(angle)) / (angle**2))
-            + W2 * ((angle - torch.sin(angle)) / (angle**3))
-        )
+        V = I + W * ((1.0 - torch.cos(angle)) / (angle**2)) + W2 * ((angle - torch.sin(angle)) / (angle**3))
     return V
 
 

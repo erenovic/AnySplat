@@ -19,7 +19,7 @@ class Loss(nn.Module, ABC, Generic[T_cfg, T_wrapper]):
 
     def __init__(self, cfg: T_wrapper) -> None:
         super().__init__()
-        
+
         # Extract the configuration from the wrapper.
         (field,) = fields(type(cfg))
         self.cfg = getattr(cfg, field.name)

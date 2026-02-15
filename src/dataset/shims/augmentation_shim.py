@@ -40,21 +40,26 @@ def apply_augmentation_shim(
     # Do not augment with 50% chance.
     if torch.rand(tuple(), generator=generator) < 0.5:
         return example
-    
+
     return {
         **example,
         "context": reflect_views(example["context"]),
         "target": reflect_views(example["target"]),
     }
 
+
 def rotate_90_degrees(
-    image: torch.Tensor, depth_map: torch.Tensor | None, extri_opencv: torch.Tensor, intri_opencv: torch.Tensor, clockwise=True
+    image: torch.Tensor,
+    depth_map: torch.Tensor | None,
+    extri_opencv: torch.Tensor,
+    intri_opencv: torch.Tensor,
+    clockwise=True,
 ):
     """
     Rotates the input image, depth map, and camera parameters by 90 degrees.
 
     Applies one of two 90-degree rotations:
-    - Clockwise 
+    - Clockwise
     - Counterclockwise (if clockwise=False)
 
     The extrinsic and intrinsic matrices are adjusted accordingly to maintain
@@ -84,7 +89,7 @@ def rotate_90_degrees(
             Where each is the updated version after the rotation.
     """
     image_height, image_width = image.shape[-2:]
-    
+
     # Rotate the image and depth map
     rotated_image, rotated_depth_map = rotate_image_and_depth_rot90(image, depth_map, clockwise)
     # Adjust the intrinsic matrix
@@ -151,28 +156,30 @@ def adjust_extrinsic_matrix_rot90(extri_opencv: torch.Tensor, clockwise: bool):
     t = extri_opencv[:3, 3]
 
     if clockwise:
-        R_rotation = torch.tensor([
-            [0, -1, 0],
-            [1,  0, 0],
-            [0,  0, 1]
-        ], dtype=extri_opencv.dtype, device=extri_opencv.device)
+        R_rotation = torch.tensor(
+            [[0, -1, 0], [1, 0, 0], [0, 0, 1]], dtype=extri_opencv.dtype, device=extri_opencv.device
+        )
     else:
-        R_rotation = torch.tensor([
-            [0, 1, 0],
-            [-1, 0, 0],
-            [0, 0, 1]
-        ], dtype=extri_opencv.dtype, device=extri_opencv.device)
+        R_rotation = torch.tensor(
+            [[0, 1, 0], [-1, 0, 0], [0, 0, 1]], dtype=extri_opencv.dtype, device=extri_opencv.device
+        )
 
     new_R = torch.matmul(R_rotation, R)
     new_t = torch.matmul(R_rotation, t)
     new_extri_opencv = torch.cat((new_R, new_t.reshape(-1, 1)), dim=1)
-    new_extri_opencv = torch.cat((new_extri_opencv, 
-                                  torch.tensor([[0, 0, 0, 1]], 
-                                dtype=extri_opencv.dtype, device=extri_opencv.device)), dim=0)
+    new_extri_opencv = torch.cat(
+        (
+            new_extri_opencv,
+            torch.tensor([[0, 0, 0, 1]], dtype=extri_opencv.dtype, device=extri_opencv.device),
+        ),
+        dim=0,
+    )
     return new_extri_opencv
 
 
-def adjust_intrinsic_matrix_rot90(intri_opencv: torch.Tensor, image_width: int, image_height: int, clockwise: bool):
+def adjust_intrinsic_matrix_rot90(
+    intri_opencv: torch.Tensor, image_width: int, image_height: int, clockwise: bool
+):
     """
     Adjusts the intrinsic matrix (3x3) for a 90-degree rotation of the image in the image plane.
 
@@ -212,7 +219,7 @@ def adjust_intrinsic_matrix_rot90(intri_opencv: torch.Tensor, image_width: int, 
         new_intri_opencv[1, 1] = fx
         new_intri_opencv[0, 2] = cy
         new_intri_opencv[1, 2] = image_width - cx
-    
+
     new_intri_opencv[0, :] /= image_height
     new_intri_opencv[1, :] /= image_width
 

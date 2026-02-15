@@ -201,9 +201,7 @@ class PixelwiseTaskWithDPT(nn.Module):
         self.dpt.init(**dpt_init_args)
 
     def forward(self, x, depths, imgs, img_info, conf=None):
-        out, interm_feats = self.dpt(
-            x, depths, imgs, image_size=(img_info[0], img_info[1]), conf=conf
-        )
+        out, interm_feats = self.dpt(x, depths, imgs, image_size=(img_info[0], img_info[1]), conf=conf)
         if self.postprocess:
             out = self.postprocess(out, self.depth_mode, self.conf_mode)
         return out, interm_feats

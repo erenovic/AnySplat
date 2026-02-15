@@ -20,14 +20,14 @@ def _fspecial_gauss_1d(size: int, sigma: float) -> Tensor:
     coords = torch.arange(size, dtype=torch.float)
     coords -= size // 2
 
-    g = torch.exp(-(coords ** 2) / (2 * sigma ** 2))
+    g = torch.exp(-(coords**2) / (2 * sigma**2))
     g /= g.sum()
 
     return g.unsqueeze(0).unsqueeze(0)
 
 
 def gaussian_filter(input: Tensor, win: Tensor) -> Tensor:
-    r""" Blur input with 1-D kernel
+    r"""Blur input with 1-D kernel
     Args:
         input (torch.Tensor): a batch of tensors to be blurred
         window (torch.Tensor): 1-D gauss kernel
@@ -64,7 +64,7 @@ def _ssim(
     K: Union[Tuple[float, float], List[float]] = (0.01, 0.03),
     retrun_seprate: bool = False,
 ) -> Tuple[Tensor, Tensor, Tensor | None, Tensor | None, Tensor | None]:
-    r""" Calculate ssim index for X and Y
+    r"""Calculate ssim index for X and Y
 
     Args:
         X (torch.Tensor): images
@@ -104,11 +104,10 @@ def _ssim(
 
     brightness = contrast = structure = torch.zeros_like(ssim_per_channel)
     if retrun_seprate:
-        epsilon = torch.finfo(torch.float32).eps**2
+        epsilon = torch.finfo(torch.float32).eps ** 2
         sigma1_sq = sigma1_sq.clamp(min=epsilon)
         sigma2_sq = sigma2_sq.clamp(min=epsilon)
-        sigma12 = torch.sign(sigma12) * torch.minimum(
-            torch.sqrt(sigma1_sq * sigma2_sq), torch.abs(sigma12))
+        sigma12 = torch.sign(sigma12) * torch.minimum(torch.sqrt(sigma1_sq * sigma2_sq), torch.abs(sigma12))
 
         C3 = C2 / 2
         sigma1_sigma2 = torch.sqrt(sigma1_sq) * torch.sqrt(sigma2_sq)
@@ -138,7 +137,7 @@ def ssim(
     nonnegative_ssim: bool = False,
     retrun_seprate: bool = False,
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
-    r""" interface of ssim
+    r"""interface of ssim
     Args:
         X (torch.Tensor): a batch of images, (N,C,H,W)
         Y (torch.Tensor): a batch of images, (N,C,H,W)
@@ -164,7 +163,7 @@ def ssim(
     if len(X.shape) not in (4, 5):
         raise ValueError(f"Input images should be 4-d or 5-d tensors, but got {X.shape}")
 
-    #if not X.type() == Y.type():
+    # if not X.type() == Y.type():
     #    raise ValueError(f"Input images should have the same dtype, but got {X.type()} and {Y.type()}.")
 
     if win is not None:  # set win_size
@@ -177,8 +176,9 @@ def ssim(
         win = _fspecial_gauss_1d(win_size, win_sigma)
         win = win.repeat([X.shape[1]] + [1] * (len(X.shape) - 1))
 
-    ssim_per_channel, cs, brightness, contrast, structure \
-        = _ssim(X, Y, data_range=data_range, win=win, size_average=False, K=K, retrun_seprate=retrun_seprate)
+    ssim_per_channel, cs, brightness, contrast, structure = _ssim(
+        X, Y, data_range=data_range, win=win, size_average=False, K=K, retrun_seprate=retrun_seprate
+    )
 
     if nonnegative_ssim:
         ssim_per_channel = torch.relu(ssim_per_channel)
@@ -198,9 +198,9 @@ def ms_ssim(
     win_sigma: float = 1.5,
     win: Optional[Tensor] = None,
     weights: Optional[List[float]] = None,
-    K: Union[Tuple[float, float], List[float]] = (0.01, 0.03)
+    K: Union[Tuple[float, float], List[float]] = (0.01, 0.03),
 ) -> Tensor:
-    r""" interface of ms-ssim
+    r"""interface of ms-ssim
     Args:
         X (torch.Tensor): a batch of images, (N,C,[T,]H,W)
         Y (torch.Tensor): a batch of images, (N,C,[T,]H,W)
@@ -221,7 +221,7 @@ def ms_ssim(
         X = X.squeeze(dim=d)
         Y = Y.squeeze(dim=d)
 
-    #if not X.type() == Y.type():
+    # if not X.type() == Y.type():
     #    raise ValueError(f"Input images should have the same dtype, but got {X.type()} and {Y.type()}.")
 
     if len(X.shape) == 4:
@@ -238,9 +238,10 @@ def ms_ssim(
         raise ValueError("Window size should be odd.")
 
     smaller_side = min(X.shape[-2:])
-    assert smaller_side > (win_size - 1) * (
-        2 ** 4
-    ), "Image size should be larger than %d due to the 4 downsamplings in ms-ssim" % ((win_size - 1) * (2 ** 4))
+    assert smaller_side > (win_size - 1) * (2**4), (
+        "Image size should be larger than %d due to the 4 downsamplings in ms-ssim"
+        % ((win_size - 1) * (2**4))
+    )
 
     if weights is None:
         weights = [0.0448, 0.2856, 0.3001, 0.2363, 0.1333]
@@ -283,7 +284,7 @@ class SSIM(torch.nn.Module):
         K: Union[Tuple[float, float], List[float]] = (0.01, 0.03),
         nonnegative_ssim: bool = False,
     ) -> None:
-        r""" class for ssim
+        r"""class for ssim
         Args:
             data_range (float or int, optional): value range of input images. (usually 1.0 or 255)
             size_average (bool, optional): if size_average=True, ssim of all images will be averaged as a scalar
@@ -326,7 +327,7 @@ class MS_SSIM(torch.nn.Module):
         weights: Optional[List[float]] = None,
         K: Union[Tuple[float, float], List[float]] = (0.01, 0.03),
     ) -> None:
-        r""" class for ms-ssim
+        r"""class for ms-ssim
         Args:
             data_range (float or int, optional): value range of input images. (usually 1.0 or 255)
             size_average (bool, optional): if size_average=True, ssim of all images will be averaged as a scalar

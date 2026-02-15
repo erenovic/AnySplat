@@ -100,7 +100,7 @@ class ViewSamplerSequential(ViewSampler[ViewSamplerSequentialCfg]):
         # neighbour_scale=1.0 -> all frames; 0.2 -> the closest 20%; etc.
         # Clamped to at least n so FPS always has enough frames to choose from.
         n_cands = max(n, round(self.cfg.neighbour_scale * N))
-        candidates = dist_all[start].argsort()[:n_cands]                  # (C,)
+        candidates = dist_all[start].argsort()[:n_cands]  # (C,)
 
         # FPS on the candidate set using the precomputed submatrix.
         dist_cand = dist_all[candidates][:, candidates]  # (C, C)
@@ -113,9 +113,7 @@ class ViewSamplerSequential(ViewSampler[ViewSamplerSequentialCfg]):
             k = self.cfg.group_size
             stride = k - 1
             n_groups = (n - 1) // stride
-            expand_idx = torch.cat(
-                [torch.arange(g * stride, g * stride + k) for g in range(n_groups)]
-            )
+            expand_idx = torch.cat([torch.arange(g * stride, g * stride + k) for g in range(n_groups)])
             view_indices = view_indices[expand_idx]  # (n_groups * k,)
 
         return view_indices.to(torch.int64)

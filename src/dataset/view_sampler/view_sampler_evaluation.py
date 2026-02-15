@@ -42,7 +42,7 @@ class ViewSamplerEvaluation(ViewSampler[ViewSamplerEvaluationCfg]):
                 k: None if v is None else from_dict(IndexEntry, v, dacite_config)
                 for k, v in json.load(f).items()
             }
-        
+
     def sample(
         self,
         scene: str,
@@ -59,7 +59,7 @@ class ViewSamplerEvaluation(ViewSampler[ViewSamplerEvaluationCfg]):
             raise ValueError(f"No indices available for scene {scene}.")
         context_indices = torch.tensor(entry.context, dtype=torch.int64, device=device)
         target_indices = torch.tensor(entry.target, dtype=torch.int64, device=device)
-        return context_indices, target_indices, torch.zeros(1) 
+        return context_indices, target_indices, torch.zeros(1)
 
     @property
     def num_context_views(self) -> int:

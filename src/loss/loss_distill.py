@@ -7,6 +7,7 @@ from src.model.encoder.vggt.utils.pose_enc import pose_encoding_to_extri_intri
 from src.model.encoder.vggt.utils.rotation import mat_to_quat
 from src.utils.point import get_normal_map
 
+
 def extri_intri_to_pose_encoding(
     extrinsics,
     intrinsics,
@@ -48,7 +49,7 @@ def extri_intri_to_pose_encoding(
     if pose_encoding_type == "absT_quaR_FoV":
         R = extrinsics[:, :, :3, :3]  # BxSx3x3
         T = extrinsics[:, :, :3, 3]  # BxSx3
-        
+
         quat = mat_to_quat(R)
         # Note the order of h and w here
         # H, W = image_size_hw
@@ -61,13 +62,15 @@ def extri_intri_to_pose_encoding(
         raise NotImplementedError
 
     return pose_encoding
-    
+
+
 def huber_loss(x, y, delta=1.0):
     """Calculate element-wise Huber loss between x and y"""
     diff = x - y
     abs_diff = diff.abs()
     flag = (abs_diff <= delta).to(diff.dtype)
     return flag * 0.5 * diff**2 + (1 - flag) * delta * (abs_diff - 0.5 * delta)
+
 
 class DistillLoss(nn.Module):
     def __init__(self, delta=1.0, gamma=0.6, weight_pose=1.0, weight_depth=1.0, weight_normal=1.0):
@@ -105,7 +108,7 @@ class DistillLoss(nn.Module):
         loss_T = loss_T.mean()
         loss_R = loss_R.mean()
         loss_fl = loss_fl.mean()
-        
+
         return loss_T, loss_R, loss_fl
 
     def forward(self, distill_infos, pred_pose_enc_list, prediction, batch):
@@ -113,7 +116,7 @@ class DistillLoss(nn.Module):
 
         if pred_pose_enc_list is not None:
             num_predictions = len(pred_pose_enc_list)
-            pesudo_gt_pose_enc = distill_infos['pred_pose_enc_list']
+            pesudo_gt_pose_enc = distill_infos["pred_pose_enc_list"]
             for i in range(num_predictions):
                 i_weight = self.gamma ** (num_predictions - i - 1)
                 cur_pred_pose_enc = pred_pose_enc_list[i]
@@ -121,31 +124,33 @@ class DistillLoss(nn.Module):
                 loss_pose += i_weight * huber_loss(cur_pred_pose_enc, cur_pesudo_gt_pose_enc).mean()
             loss_pose = loss_pose / num_predictions
             loss_pose = torch.nan_to_num(loss_pose, nan=0.0, posinf=0.0, neginf=0.0)
-        
+
         pred_depth = prediction.depth.flatten(0, 1)
-        pesudo_gt_depth = distill_infos['depth_map'].flatten(0, 1).squeeze(-1)
-        conf_mask = distill_infos['conf_mask'].flatten(0, 1)
+        pesudo_gt_depth = distill_infos["depth_map"].flatten(0, 1).squeeze(-1)
+        conf_mask = distill_infos["conf_mask"].flatten(0, 1)
 
-        if batch['context']['valid_mask'].sum() > 0:
-            conf_mask = batch['context']['valid_mask'].flatten(0, 1)
+        if batch["context"]["valid_mask"].sum() > 0:
+            conf_mask = batch["context"]["valid_mask"].flatten(0, 1)
 
-        loss_depth = F.mse_loss(pred_depth[conf_mask], pesudo_gt_depth[conf_mask], reduction='none').mean()
+        loss_depth = F.mse_loss(pred_depth[conf_mask], pesudo_gt_depth[conf_mask], reduction="none").mean()
 
         render_normal = get_normal_map(pred_depth, batch["context"]["intrinsics"].flatten(0, 1))
         pred_normal = get_normal_map(pesudo_gt_depth, batch["context"]["intrinsics"].flatten(0, 1))
-        
+
         alpha1_loss = (1 - (render_normal[conf_mask] * pred_normal[conf_mask]).sum(-1)).mean()
-        alpha2_loss = F.l1_loss(render_normal[conf_mask], pred_normal[conf_mask], reduction='mean')
+        alpha2_loss = F.l1_loss(render_normal[conf_mask], pred_normal[conf_mask], reduction="mean")
         loss_normal = (alpha1_loss + alpha2_loss) / 2
-        
-        loss_distill = loss_pose * self.weight_pose + loss_depth * self.weight_depth + loss_normal * self.weight_normal
+
+        loss_distill = (
+            loss_pose * self.weight_pose + loss_depth * self.weight_depth + loss_normal * self.weight_normal
+        )
         loss_distill = torch.nan_to_num(loss_distill, nan=0.0, posinf=0.0, neginf=0.0)
-        
+
         loss_dict = {
             "loss_distill": loss_distill,
             "loss_pose": loss_pose * self.weight_pose,
             "loss_depth": loss_depth * self.weight_depth,
-            "loss_normal": loss_normal * self.weight_normal
+            "loss_normal": loss_normal * self.weight_normal,
         }
 
         return loss_dict

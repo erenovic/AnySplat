@@ -14,6 +14,7 @@ from dataclasses import fields
 import torch.nn.functional as F
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # from src.loss.depth_anything.dpt import DepthAnything
 from src.misc.utils import vis_depth_map
@@ -26,6 +27,7 @@ T_wrapper = TypeVar("T_wrapper")
 class LossDepthGTCfg:
     weight: float
     type: Literal["l1", "mse", "silog", "gradient", "l1+gradient"] | None
+
 
 @dataclass
 class LossDepthGTCfgWrapper:
@@ -56,9 +58,9 @@ class LossDepthGT(Loss[LossDepthGTCfg, LossDepthGTCfgWrapper]):
             gradient_loss = 0
         else:
             gradient_loss = (loss_x + loss_y) / (num_valid + 1e-6)
-        
+
         return gradient_loss
-    
+
     def forward(
         self,
         prediction: DecoderOutput,
@@ -71,17 +73,21 @@ class LossDepthGT(Loss[LossDepthGTCfg, LossDepthGTCfgWrapper]):
         # prediction: B, H, W, C
         # target: B, H, W, C
         # mask: B, H, W
-        
+
         target_depth = batch["target"]["depth"]
         target_valid_mask = batch["target"]["valid_mask"]
         gs_depth = prediction.depth.clamp(1e-3)
-        
+
         if self.cfg.type == "l1":
             depth_loss = torch.abs(target_depth[target_valid_mask] - gs_depth[target_valid_mask]).mean()
         elif self.cfg.type == "mse":
             depth_loss = F.mse_loss(target_depth[target_valid_mask], gs_depth[target_valid_mask])
         elif self.cfg.type == "silog":
-            depth_loss = torch.log(gs_depth[target_valid_mask]) ** 2 + (gs_depth[target_valid_mask] - target_depth[target_valid_mask]) ** 2 - 0.5
+            depth_loss = (
+                torch.log(gs_depth[target_valid_mask]) ** 2
+                + (gs_depth[target_valid_mask] - target_depth[target_valid_mask]) ** 2
+                - 0.5
+            )
             depth_loss = depth_loss.mean()
         elif self.cfg.type == "gradient":
             depth_loss = self.gradient_loss(gs_depth, target_depth, target_valid_mask)

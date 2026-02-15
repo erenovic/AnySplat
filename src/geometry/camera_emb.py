@@ -6,13 +6,16 @@ from ..misc.sht import rsh_cart_2, rsh_cart_4, rsh_cart_6, rsh_cart_8
 
 def get_intrinsic_embedding(context, degree=0, downsample=1, merge_hw=False):
     assert degree in [0, 2, 4, 8]
-    
+
     b, v, _, h, w = context["image"].shape
     device = context["image"].device
     tgt_h, tgt_w = h // downsample, w // downsample
     xy_ray, _ = sample_image_grid((tgt_h, tgt_w), device)
     xy_ray = xy_ray[None, None, ...].expand(b, v, -1, -1, -1)  # [b, v, h, w, 2]
-    directions = get_local_rays(xy_ray, rearrange(context["intrinsics"], "b v i j -> b v () () i j"),)
+    directions = get_local_rays(
+        xy_ray,
+        rearrange(context["intrinsics"], "b v i j -> b v () () i j"),
+    )
 
     if degree == 2:
         directions = rsh_cart_2(directions)

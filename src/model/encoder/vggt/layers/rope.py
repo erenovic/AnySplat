@@ -168,14 +168,18 @@ class RotaryPositionEmbedding2D(nn.Module):
         """
         # Validate inputs
         assert tokens.size(-1) % 2 == 0, "Feature dimension must be even"
-        assert positions.ndim == 3 and positions.shape[-1] == 2, "Positions must have shape (batch_size, n_tokens, 2)"
+        assert positions.ndim == 3 and positions.shape[-1] == 2, (
+            "Positions must have shape (batch_size, n_tokens, 2)"
+        )
 
         # Compute feature dimension for each spatial direction
         feature_dim = tokens.size(-1) // 2
 
         # Get frequency components
         max_position = int(positions.max()) + 1
-        cos_comp, sin_comp = self._compute_frequency_components(feature_dim, max_position, tokens.device, tokens.dtype)
+        cos_comp, sin_comp = self._compute_frequency_components(
+            feature_dim, max_position, tokens.device, tokens.dtype
+        )
 
         # Split features for vertical and horizontal processing
         vertical_features, horizontal_features = tokens.chunk(2, dim=-1)

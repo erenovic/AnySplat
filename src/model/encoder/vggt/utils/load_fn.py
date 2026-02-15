@@ -8,6 +8,7 @@ import torch
 from PIL import Image
 from torchvision import transforms as TF
 
+
 def load_and_preprocess_images(image_path_list, mode="crop"):
     """
     A quick start function to load and preprocess images for model input.
@@ -19,7 +20,7 @@ def load_and_preprocess_images(image_path_list, mode="crop"):
                              - "crop" (default): Sets width to 518px and center crops height if needed.
                              - "pad": Preserves all pixels by making the largest dimension 518px
                                and padding the smaller dimension to reach a square shape.
-    
+
     Returns:
         torch.Tensor: Batched tensor of preprocessed images with shape (N, 3, H, W)
 
@@ -38,7 +39,7 @@ def load_and_preprocess_images(image_path_list, mode="crop"):
     # Check for empty list
     if len(image_path_list) == 0:
         raise ValueError("At least 1 image is required")
-    
+
     # Validate mode
     if mode not in ["crop", "pad"]:
         raise ValueError("Mode must be either 'crop' or 'pad'")
@@ -50,7 +51,6 @@ def load_and_preprocess_images(image_path_list, mode="crop"):
 
     # First process all images and collect their shapes
     for image_path in image_path_list:
-
         # Open image
         img = Image.open(image_path)
 
@@ -65,7 +65,7 @@ def load_and_preprocess_images(image_path_list, mode="crop"):
         img = img.convert("RGB")
 
         width, height = img.size
-        
+
         if mode == "pad":
             # Make the largest dimension 518px while maintaining aspect ratio
             if width >= height:
@@ -83,23 +83,23 @@ def load_and_preprocess_images(image_path_list, mode="crop"):
         # Resize with new dimensions (width, height)
         img = img.resize((new_width, new_height), Image.Resampling.BICUBIC)
         img = to_tensor(img)  # Convert to tensor (0, 1)
-        
+
         # Center crop height if it's larger than 518 (only in crop mode)
         if mode == "crop" and new_height > target_size:
             start_y = (new_height - target_size) // 2
             img = img[:, start_y : start_y + target_size, :]
-        
+
         # For pad mode, pad to make a square of target_size x target_size
         if mode == "pad":
             h_padding = target_size - img.shape[1]
             w_padding = target_size - img.shape[2]
-            
+
             if h_padding > 0 or w_padding > 0:
                 pad_top = h_padding // 2
                 pad_bottom = h_padding - pad_top
                 pad_left = w_padding // 2
                 pad_right = w_padding - pad_left
-                
+
                 # Pad with white (value=1.0)
                 img = torch.nn.functional.pad(
                     img, (pad_left, pad_right, pad_top, pad_bottom), mode="constant", value=1.0

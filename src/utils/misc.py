@@ -113,9 +113,7 @@ class MetricLogger(object):
             return self.meters[attr]
         if attr in self.__dict__:
             return self.__dict__[attr]
-        raise AttributeError(
-            "'{}' object has no attribute '{}'".format(type(self).__name__, attr)
-        )
+        raise AttributeError("'{}' object has no attribute '{}'".format(type(self).__name__, attr))
 
     def __str__(self):
         loss_str = []
@@ -188,11 +186,7 @@ class MetricLogger(object):
                 break
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
-        print(
-            "{} Total time: {} ({:.4f} s / it)".format(
-                header, total_time_str, total_time / len_iterable
-            )
-        )
+        print("{} Total time: {} ({:.4f} s / it)".format(header, total_time_str, total_time / len_iterable))
 
 
 def setup_for_distributed(is_master):
@@ -258,9 +252,7 @@ def init_distributed_mode(args):
     torch.cuda.set_device(args.gpu)
     args.dist_backend = "nccl"
     print(
-        "| distributed init (rank {}): {}, gpu {}".format(
-            args.rank, args.dist_url, args.gpu
-        ),
+        "| distributed init (rank {}): {}, gpu {}".format(args.rank, args.dist_url, args.gpu),
         flush=True,
     )
     torch.distributed.init_process_group(
@@ -326,17 +318,13 @@ def get_grad_norm_(parameters, norm_type: float = 2.0) -> torch.Tensor:
         total_norm = max(p.grad.detach().abs().max().to(device) for p in parameters)
     else:
         total_norm = torch.norm(
-            torch.stack(
-                [torch.norm(p.grad.detach(), norm_type).to(device) for p in parameters]
-            ),
+            torch.stack([torch.norm(p.grad.detach(), norm_type).to(device) for p in parameters]),
             norm_type,
         )
     return total_norm
 
 
-def save_model(
-    args, epoch, model_without_ddp, optimizer, loss_scaler, fname=None, best_so_far=None
-):
+def save_model(args, epoch, model_without_ddp, optimizer, loss_scaler, fname=None, best_so_far=None):
     output_dir = Path(args.output_dir)
     if fname is None:
         fname = str(epoch)
@@ -359,9 +347,7 @@ def load_model(args, model_without_ddp, optimizer, loss_scaler):
     best_so_far = None
     if args.resume is not None:
         if args.resume.startswith("https"):
-            checkpoint = torch.hub.load_state_dict_from_url(
-                args.resume, map_location="cpu", check_hash=True
-            )
+            checkpoint = torch.hub.load_state_dict_from_url(args.resume, map_location="cpu", check_hash=True)
         else:
             checkpoint = torch.load(args.resume, map_location="cpu")
         print("Resume checkpoint %s" % args.resume)
@@ -415,9 +401,7 @@ def filename(obj):
         obj = repr(obj)
     obj = str(obj).replace("()", "")
     obj = _replace(obj, "_,(*/\1\2", "-__x%/,", rm=" )'\"")
-    assert all(len(s) < 256 for s in obj.split(os.sep)), (
-        "filename too long (>256 characters):\n" + obj
-    )
+    assert all(len(s) < 256 for s in obj.split(os.sep)), "filename too long (>256 characters):\n" + obj
     return obj
 
 
@@ -429,9 +413,7 @@ def _get_num_layer_for_vit(var_name, enc_depth, dec_depth):
     elif var_name.startswith("enc_blocks"):
         layer_id = int(var_name.split(".")[1])
         return layer_id + 1
-    elif var_name.startswith("decoder_embed") or var_name.startswith(
-        "enc_norm"
-    ):  # part of the last black
+    elif var_name.startswith("decoder_embed") or var_name.startswith("enc_norm"):  # part of the last black
         return enc_depth
     elif var_name.startswith("dec_blocks"):
         layer_id = int(var_name.split(".")[1])
@@ -444,9 +426,7 @@ def _get_num_layer_for_vit(var_name, enc_depth, dec_depth):
         raise NotImplementedError(var_name)
 
 
-def get_parameter_groups(
-    model, weight_decay, layer_decay=1.0, skip_list=(), no_lr_scale_list=[]
-):
+def get_parameter_groups(model, weight_decay, layer_decay=1.0, skip_list=(), no_lr_scale_list=[]):
     parameter_group_names = {}
     parameter_group_vars = {}
     enc_depth, dec_depth = None, None
@@ -456,9 +436,7 @@ def get_parameter_groups(
         enc_depth = model.enc_depth
         dec_depth = model.dec_depth if hasattr(model, "dec_blocks") else 0
         num_layers = enc_depth + dec_depth
-        layer_decay_values = list(
-            layer_decay ** (num_layers + 1 - i) for i in range(num_layers + 2)
-        )
+        layer_decay_values = list(layer_decay ** (num_layers + 1 - i) for i in range(num_layers + 2))
 
     for name, param in model.named_parameters():
         if not param.requires_grad:
@@ -514,12 +492,7 @@ def adjust_learning_rate(optimizer, epoch, args):
         lr = args.lr * epoch / args.warmup_epochs
     else:
         lr = args.min_lr + (args.lr - args.min_lr) * 0.5 * (
-            1.0
-            + math.cos(
-                math.pi
-                * (epoch - args.warmup_epochs)
-                / (args.epochs - args.warmup_epochs)
-            )
+            1.0 + math.cos(math.pi * (epoch - args.warmup_epochs) / (args.epochs - args.warmup_epochs))
         )
 
     for param_group in optimizer.param_groups:

@@ -81,9 +81,7 @@ class SimpleTrainer:
         save_imgs: bool = False,
         model_type: Literal["3dgs", "2dgs"] = "3dgs",
     ):
-        optimizer = optim.Adam(
-            [self.rgbs, self.means, self.scales, self.opacities, self.quats], lr
-        )
+        optimizer = optim.Adam([self.rgbs, self.means, self.scales, self.opacities, self.quats], lr)
         mse_loss = torch.nn.MSELoss()
         frames = []
         times = [0] * 2  # rasterization, backward
@@ -145,7 +143,7 @@ class SimpleTrainer:
             )
         print(f"Total(s):\nRasterization: {times[0]:.3f}, Backward: {times[1]:.3f}")
         print(
-            f"Per step(s):\nRasterization: {times[0]/iterations:.5f}, Backward: {times[1]/iterations:.5f}"
+            f"Per step(s):\nRasterization: {times[0] / iterations:.5f}, Backward: {times[1] / iterations:.5f}"
         )
 
 

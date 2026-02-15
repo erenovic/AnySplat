@@ -21,13 +21,13 @@ class ValidationWrapper(Dataset):
 
     def __len__(self):
         return self.length
-        
+
     def __getitem__(self, index: tuple):
         if isinstance(self.dataset, IterableDataset):
             if self.dataset_iterator is None:
                 self.dataset_iterator = iter(self.dataset)
             return next(self.dataset_iterator)
-        
+
         random_index = torch.randint(0, len(self.dataset), tuple())
         random_context_num = torch.randint(2, self.dataset.view_sampler.num_context_views + 1, tuple())
         # breakpoint()

@@ -42,9 +42,7 @@ class ViewSamplerArbitrary(ViewSampler[ViewSamplerArbitraryCfg]):
 
         # Allow the context views to be fixed.
         if self.cfg.context_views is not None:
-            index_context = torch.tensor(
-                self.cfg.context_views, dtype=torch.int64, device=device
-            )
+            index_context = torch.tensor(self.cfg.context_views, dtype=torch.int64, device=device)
 
             if self.cfg.num_context_views == 3 and len(self.cfg.context_views) == 2:
                 index_context = add_third_context_index(index_context)
@@ -60,9 +58,7 @@ class ViewSamplerArbitrary(ViewSampler[ViewSamplerArbitraryCfg]):
         # Allow the target views to be fixed.
         if self.cfg.target_views is not None:
             assert len(self.cfg.target_views) == self.cfg.num_target_views
-            index_target = torch.tensor(
-                self.cfg.target_views, dtype=torch.int64, device=device
-            )
+            index_target = torch.tensor(self.cfg.target_views, dtype=torch.int64, device=device)
 
         overlap = torch.tensor([0.5], dtype=torch.float32, device=device)  # dummy
 

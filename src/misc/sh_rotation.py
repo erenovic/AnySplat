@@ -15,10 +15,18 @@ def rotate_sh(
     dtype = sh_coefficients.dtype
 
     # change the basis from YZX -> XYZ to fit the convention of e3nn
-    P = torch.tensor([[0, 0, 1], [1, 0, 0], [0, 1, 0]],
-                     dtype=sh_coefficients.dtype, device=sh_coefficients.device)
-    inversed_P = torch.tensor([[0, 1, 0], [0, 0, 1], [1, 0, 0], ],
-                              dtype=sh_coefficients.dtype, device=sh_coefficients.device)
+    P = torch.tensor(
+        [[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=sh_coefficients.dtype, device=sh_coefficients.device
+    )
+    inversed_P = torch.tensor(
+        [
+            [0, 1, 0],
+            [0, 0, 1],
+            [1, 0, 0],
+        ],
+        dtype=sh_coefficients.dtype,
+        device=sh_coefficients.device,
+    )
     permuted_rotation_matrix = inversed_P @ rotations @ P
 
     *_, n = sh_coefficients.shape
@@ -103,9 +111,7 @@ if __name__ == "__main__":
         plt.savefig(path)
 
     for i, angle in enumerate(torch.linspace(0, 2 * torch.pi, 30)):
-        rotation = torch.tensor(
-            R.from_euler("x", angle.item()).as_matrix(), device=device
-        )
+        rotation = torch.tensor(R.from_euler("x", angle.item()).as_matrix(), device=device)
         plot_sh(rotate_sh(coefficients, rotation), Path(f"sh_rotation/{i:0>3}.png"))
 
     print("Done!")

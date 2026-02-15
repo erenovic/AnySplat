@@ -8,63 +8,62 @@ from src.geometry.ptc_geometry import geotrf, inv, normalize_pointcloud, depthma
 
 
 def get_pred_pts3d(gt, pred, use_pose=False):
-    if 'depth' in pred and 'pseudo_focal' in pred:
+    if "depth" in pred and "pseudo_focal" in pred:
         try:
-            pp = gt['camera_intrinsics'][..., :2, 2]
+            pp = gt["camera_intrinsics"][..., :2, 2]
         except KeyError:
             pp = None
         pts3d = depthmap_to_pts3d(**pred, pp=pp)
-        
-    elif 'pts3d' in pred:
-        # pts3d from my camera
-        pts3d = pred['pts3d']
 
-    elif 'pts3d_in_other_view' in pred:
+    elif "pts3d" in pred:
+        # pts3d from my camera
+        pts3d = pred["pts3d"]
+
+    elif "pts3d_in_other_view" in pred:
         # pts3d from the other camera, already transformed
         assert use_pose is True
-        return pred['pts3d_in_other_view']  # return!
+        return pred["pts3d_in_other_view"]  # return!
 
     if use_pose:
-        camera_pose = pred.get('camera_pose')
+        camera_pose = pred.get("camera_pose")
         assert camera_pose is not None
         pts3d = geotrf(camera_pose, pts3d)
 
     return pts3d
 
 
-class LLoss (nn.Module):
-    """ L-norm loss
-    """
+class LLoss(nn.Module):
+    """L-norm loss"""
 
-    def __init__(self, reduction='mean'):
+    def __init__(self, reduction="mean"):
         super().__init__()
         self.reduction = reduction
-    
+
     def forward(self, a, b):
-        assert a.shape == b.shape and a.ndim >= 2 and 1 <= a.shape[-1] <= 3, f'Bad shape = {a.shape}'
+        assert a.shape == b.shape and a.ndim >= 2 and 1 <= a.shape[-1] <= 3, f"Bad shape = {a.shape}"
         dist = self.distance(a, b)
-        assert dist.ndim == a.ndim-1  # one dimension less
-        if self.reduction == 'none':
+        assert dist.ndim == a.ndim - 1  # one dimension less
+        if self.reduction == "none":
             return dist
-        if self.reduction == 'sum':
+        if self.reduction == "sum":
             return dist.sum()
-        if self.reduction == 'mean':
+        if self.reduction == "mean":
             return dist.mean() if dist.numel() > 0 else dist.new_zeros(())
-        raise ValueError(f'bad {self.reduction=} mode')
+        raise ValueError(f"bad {self.reduction=} mode")
 
     def distance(self, a, b):
         raise NotImplementedError()
 
 
-class L21Loss (LLoss):
-    """ Euclidean distance between 3d points  """
+class L21Loss(LLoss):
+    """Euclidean distance between 3d points"""
 
     def distance(self, a, b):
         return torch.norm(a - b, dim=-1)  # normalized L2 distance
 
 
-class MultiLoss (nn.Module):
-    """ Easily combinable losses (also keep track of individual loss values):
+class MultiLoss(nn.Module):
+    """Easily combinable losses (also keep track of individual loss values):
         loss = MyLoss1() + 0.1*MyLoss2()
     Usage:
         Inherit from this class and override get_name() and compute_loss()
@@ -86,6 +85,7 @@ class MultiLoss (nn.Module):
         res = copy(self)
         res._alpha = alpha
         return res
+
     __rmul__ = __mul__  # same
 
     def __add__(self, loss2):
@@ -100,9 +100,9 @@ class MultiLoss (nn.Module):
     def __repr__(self):
         name = self.get_name()
         if self._alpha != 1:
-            name = f'{self._alpha:g}*{name}'
+            name = f"{self._alpha:g}*{name}"
         if self._loss2:
-            name = f'{name} + {self._loss2}'
+            name = f"{name} + {self._loss2}"
         return name
 
     def forward(self, *args, **kwargs):
@@ -123,26 +123,26 @@ class MultiLoss (nn.Module):
         return loss, details
 
 
-class Criterion (nn.Module):
+class Criterion(nn.Module):
     def __init__(self, criterion=None):
         super().__init__()
-        assert isinstance(criterion, LLoss), f'{criterion} is not a proper criterion!'+bb()
+        assert isinstance(criterion, LLoss), f"{criterion} is not a proper criterion!" + bb()
         self.criterion = copy(criterion)
 
     def get_name(self):
-        return f'{type(self).__name__}({self.criterion})'
+        return f"{type(self).__name__}({self.criterion})"
 
     def with_reduction(self, mode):
         res = loss = deepcopy(self)
         while loss is not None:
             assert isinstance(loss, Criterion)
-            loss.criterion.reduction = 'none'  # make it return the loss for each sample
+            loss.criterion.reduction = "none"  # make it return the loss for each sample
             loss = loss._loss2  # we assume loss is a Multiloss
         return res
 
 
-class ConfLoss (MultiLoss):
-    """ Weighted regression by learned confidence.
+class ConfLoss(MultiLoss):
+    """Weighted regression by learned confidence.
         Assuming the input pixel_loss is a pixel-level regression loss.
 
     Principle:
@@ -156,10 +156,10 @@ class ConfLoss (MultiLoss):
         super().__init__()
         assert alpha > 0
         self.alpha = alpha
-        self.pixel_loss = pixel_loss.with_reduction('none')
+        self.pixel_loss = pixel_loss.with_reduction("none")
 
     def get_name(self):
-        return f'ConfLoss({self.pixel_loss})'
+        return f"ConfLoss({self.pixel_loss})"
 
     def get_conf_log(self, x):
         return x, torch.log(x)
@@ -168,13 +168,13 @@ class ConfLoss (MultiLoss):
         # compute per-pixel loss
         ((loss1, msk1), (loss2, msk2)), details = self.pixel_loss(gt1, gt2, pred1, pred2, **kw)
         if loss1.numel() == 0:
-            print('NO VALID POINTS in img1', force=True)
+            print("NO VALID POINTS in img1", force=True)
         if loss2.numel() == 0:
-            print('NO VALID POINTS in img2', force=True)
+            print("NO VALID POINTS in img2", force=True)
 
         # weight by confidence
-        conf1, log_conf1 = self.get_conf_log(pred1['conf'][msk1])
-        conf2, log_conf2 = self.get_conf_log(pred2['conf'][msk2])
+        conf1, log_conf1 = self.get_conf_log(pred1["conf"][msk1])
+        conf2, log_conf2 = self.get_conf_log(pred2["conf"][msk2])
         conf_loss1 = loss1 * conf1 - self.alpha * log_conf1
         conf_loss2 = loss2 * conf2 - self.alpha * log_conf2
 
@@ -182,21 +182,23 @@ class ConfLoss (MultiLoss):
         conf_loss1 = conf_loss1.mean() if conf_loss1.numel() > 0 else 0
         conf_loss2 = conf_loss2.mean() if conf_loss2.numel() > 0 else 0
 
-        return conf_loss1 + conf_loss2, dict(conf_loss_1=float(conf_loss1), conf_loss2=float(conf_loss2), **details)
+        return conf_loss1 + conf_loss2, dict(
+            conf_loss_1=float(conf_loss1), conf_loss2=float(conf_loss2), **details
+        )
 
 
 class Regr3D(nn.Module):
-    """ Ensure that all 3D points are correct.
-        Asymmetric loss: view1 is supposed to be the anchor.
+    """Ensure that all 3D points are correct.
+    Asymmetric loss: view1 is supposed to be the anchor.
 
-        P1 = RT1 @ D1
-        P2 = RT2 @ D2
-        loss1 = (I @ pred_D1) - (RT1^-1 @ RT1 @ D1)
-        loss2 = (RT21 @ pred_D2) - (RT1^-1 @ P2)
-              = (RT21 @ pred_D2) - (RT1^-1 @ RT2 @ D2)
+    P1 = RT1 @ D1
+    P2 = RT2 @ D2
+    loss1 = (I @ pred_D1) - (RT1^-1 @ RT1 @ D1)
+    loss2 = (RT21 @ pred_D2) - (RT1^-1 @ P2)
+          = (RT21 @ pred_D2) - (RT1^-1 @ RT2 @ D2)
     """
 
-    def __init__(self, norm_mode='avg_dis', alpha=0.2, gt_scale=False):
+    def __init__(self, norm_mode="avg_dis", alpha=0.2, gt_scale=False):
         super().__init__()
         self.norm_mode = norm_mode
         self.alpha = alpha
@@ -204,19 +206,21 @@ class Regr3D(nn.Module):
 
     def get_conf_log(self, x):
         return x, torch.log(x)
-        
-    def forward(self, gt_pts1, gt_pts2, pr_pts1, pr_pts2, conf1=None, conf2=None, dist_clip=None, disable_view1=False):
+
+    def forward(
+        self, gt_pts1, gt_pts2, pr_pts1, pr_pts2, conf1=None, conf2=None, dist_clip=None, disable_view1=False
+    ):
         valid1 = valid2 = torch.ones_like(conf1, dtype=torch.bool)
         if dist_clip is not None:
             # points that are too far-away == invalid
             dis1 = gt_pts1.norm(dim=-1)  # (B, H, W)
             dis2 = gt_pts2.norm(dim=-1)  # (B, H, W)
-            valid1 = (dis1 <= dist_clip)
-            valid2 = (dis2 <= dist_clip)
+            valid1 = dis1 <= dist_clip
+            valid2 = dis2 <= dist_clip
         else:
             dis1 = gt_pts1.norm(dim=-1)  # (B, H, W)
             dis2 = gt_pts2.norm(dim=-1)  # (B, H, W)
-            
+
             # only keep the points norm whithin the range of 1% to 99% of each batch
             # Flatten along the H and W dimensions
             dis1_flat = dis1.view(dis1.shape[0], -1)
@@ -355,4 +359,3 @@ class Regr3D(nn.Module):
     #     # conf_loss2 = conf_loss2.mean() if conf_loss2.numel() > 0 else 0
     #     #
     #     # return conf_loss1 + conf_loss2
-

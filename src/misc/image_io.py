@@ -151,9 +151,7 @@ def save_interpolated_video(
             interp_rot = torch.bmm(u, v.transpose(1, 2))
 
             # Combine interpolated rotation and translation
-            interp_extrinsic = (
-                torch.eye(4, device=pred_extrinsics.device).unsqueeze(0).repeat(b, 1, 1)
-            )
+            interp_extrinsic = torch.eye(4, device=pred_extrinsics.device).unsqueeze(0).repeat(b, 1, 1)
             interp_extrinsic[:, :3, :3] = interp_rot
             interp_extrinsic[:, :3, 3] = interp_trans
 
@@ -190,17 +188,15 @@ def save_interpolated_video(
     # Convert to video format
     video = interpolated_output.color[0].clip(min=0, max=1)
     depth = interpolated_output.depth[0]
-    
+
     # Normalize depth for visualization
     # to avoid `quantile() input tensor is too large`
-    num_views = pred_extrinsics.shape[1] 
+    num_views = pred_extrinsics.shape[1]
     depth_norm = (depth - depth[::num_views].quantile(0.01)) / (
         depth[::num_views].quantile(0.99) - depth[::num_views].quantile(0.01)
     )
     depth_norm = plt.cm.turbo(depth_norm.cpu().numpy())
-    depth_colored = (
-        torch.from_numpy(depth_norm[..., :3]).permute(0, 3, 1, 2).to(depth.device)
-    )
+    depth_colored = torch.from_numpy(depth_norm[..., :3]).permute(0, 3, 1, 2).to(depth.device)
     depth_colored = depth_colored.clip(min=0, max=1)
 
     # Save depth video

@@ -14,9 +14,9 @@ from ..model.encoder.backbone.croco.misc import invalid_to_zeros, invalid_to_nan
 
 
 def xy_grid(W, H, device=None, origin=(0, 0), unsqueeze=None, cat_dim=-1, homogeneous=False, **arange_kw):
-    """ Output a (H,W,2) array of int32 
-        with output[j,i,0] = i + origin[0]
-             output[j,i,1] = j + origin[1]
+    """Output a (H,W,2) array of int32
+    with output[j,i,0] = i + origin[0]
+         output[j,i,1] = j + origin[1]
     """
     if device is None:
         # numpy
@@ -27,8 +27,8 @@ def xy_grid(W, H, device=None, origin=(0, 0), unsqueeze=None, cat_dim=-1, homoge
         meshgrid, stack = torch.meshgrid, torch.stack
         ones = lambda *a: torch.ones(*a, device=device)
 
-    tw, th = [arange(o, o+s, **arange_kw) for s, o in zip((W, H), origin)]
-    grid = meshgrid(tw, th, indexing='xy')
+    tw, th = [arange(o, o + s, **arange_kw) for s, o in zip((W, H), origin)]
+    grid = meshgrid(tw, th, indexing="xy")
     if homogeneous:
         grid = grid + (ones((H, W)),)
     if unsqueeze is not None:
@@ -39,7 +39,7 @@ def xy_grid(W, H, device=None, origin=(0, 0), unsqueeze=None, cat_dim=-1, homoge
 
 
 def geotrf(Trf, pts, ncol=None, norm=False):
-    """ Apply a geometric transformation to a list of 3-D points.
+    """Apply a geometric transformation to a list of 3-D points.
 
     H: 3x3 or 4x4 projection matrix (typically a Homography)
     p: numpy/torch/tuple of coordinates. Shape must be (...,2) or (...,3)
@@ -60,19 +60,18 @@ def geotrf(Trf, pts, ncol=None, norm=False):
     ncol = ncol or pts.shape[-1]
 
     # optimized code
-    if (isinstance(Trf, torch.Tensor) and isinstance(pts, torch.Tensor) and
-            Trf.ndim == 3 and pts.ndim == 4):
+    if isinstance(Trf, torch.Tensor) and isinstance(pts, torch.Tensor) and Trf.ndim == 3 and pts.ndim == 4:
         d = pts.shape[3]
         if Trf.shape[-1] == d:
             pts = torch.einsum("bij, bhwj -> bhwi", Trf, pts)
-        elif Trf.shape[-1] == d+1:
+        elif Trf.shape[-1] == d + 1:
             pts = torch.einsum("bij, bhwj -> bhwi", Trf[:, :d, :d], pts) + Trf[:, None, None, :d, d]
         else:
-            raise ValueError(f'bad shape, not ending with 3 or 4, for {pts.shape=}')
+            raise ValueError(f"bad shape, not ending with 3 or 4, for {pts.shape=}")
     else:
         if Trf.ndim >= 3:
-            n = Trf.ndim-2
-            assert Trf.shape[:n] == pts.shape[:n], 'batch size does not match'
+            n = Trf.ndim - 2
+            assert Trf.shape[:n] == pts.shape[:n], "batch size does not match"
             Trf = Trf.reshape(-1, Trf.shape[-2], Trf.shape[-1])
 
             if pts.ndim > Trf.ndim:
@@ -82,7 +81,7 @@ def geotrf(Trf, pts, ncol=None, norm=False):
                 # Trf == (B,d,d) & pts == (B,d) --> (B, 1, d)
                 pts = pts[:, None, :]
 
-        if pts.shape[-1]+1 == Trf.shape[-1]:
+        if pts.shape[-1] + 1 == Trf.shape[-1]:
             Trf = Trf.swapaxes(-1, -2)  # transpose Trf
             pts = pts @ Trf[..., :-1, :] + Trf[..., -1:, :]
         elif pts.shape[-1] == Trf.shape[-1]:
@@ -103,13 +102,12 @@ def geotrf(Trf, pts, ncol=None, norm=False):
 
 
 def inv(mat):
-    """ Invert a torch or numpy matrix
-    """
+    """Invert a torch or numpy matrix"""
     if isinstance(mat, torch.Tensor):
         return torch.linalg.inv(mat)
     if isinstance(mat, np.ndarray):
         return np.linalg.inv(mat)
-    raise ValueError(f'bad matrix type = {type(mat)}')
+    raise ValueError(f"bad matrix type = {type(mat)}")
 
 
 def depthmap_to_pts3d(depth, pseudo_focal, pp=None, **_):
@@ -144,8 +142,8 @@ def depthmap_to_pts3d(depth, pseudo_focal, pp=None, **_):
 
     # set principal point
     if pp is None:
-        grid_x = grid_x - (W-1)/2
-        grid_y = grid_y - (H-1)/2
+        grid_x = grid_x - (W - 1) / 2
+        grid_y = grid_y - (H - 1) / 2
     else:
         grid_x = grid_x.expand(B, -1, -1) - pp[:, 0, None, None]
         grid_y = grid_y.expand(B, -1, -1) - pp[:, 1, None, None]
@@ -194,7 +192,7 @@ def depthmap_to_camera_coordinates(depthmap, camera_intrinsics, pseudo_focal=Non
     X_cam = np.stack((x_cam, y_cam, z_cam), axis=-1).astype(np.float32)
 
     # Mask for valid coordinates
-    valid_mask = (depthmap > 0.0)
+    valid_mask = depthmap > 0.0
     return X_cam, valid_mask
 
 
@@ -254,8 +252,9 @@ def obtain_pointcloud_center(pts, valid_mask=None):
     """
     depth = pts[..., 2]
     # only choose the 0.02-0.98 quantile as the valid depth range
-    valid_depth_mask = ((depth > depth.quantile(0.02, dim=1, keepdim=True)) &
-                        (depth < depth.quantile(0.98, dim=1, keepdim=True)))
+    valid_depth_mask = (depth > depth.quantile(0.02, dim=1, keepdim=True)) & (
+        depth < depth.quantile(0.98, dim=1, keepdim=True)
+    )
     if valid_mask is not None:
         valid_mask = valid_depth_mask & valid_mask
     else:
@@ -267,14 +266,14 @@ def obtain_pointcloud_center(pts, valid_mask=None):
     center_dis = all_dis.sum(dim=1) / (nnz + 1e-8)
     return center_dis  # (B,)
 
-def normalize_pointcloud(pts1, pts2, norm_mode='avg_dis', valid1=None, valid2=None):
-    """ renorm pointmaps pts1, pts2 with norm_mode
-    """
+
+def normalize_pointcloud(pts1, pts2, norm_mode="avg_dis", valid1=None, valid2=None):
+    """renorm pointmaps pts1, pts2 with norm_mode"""
     assert pts1.ndim >= 3 and pts1.shape[-1] == 3
     assert pts2 is None or (pts2.ndim >= 3 and pts2.shape[-1] == 3)
-    norm_mode, dis_mode = norm_mode.split('_')
+    norm_mode, dis_mode = norm_mode.split("_")
 
-    if norm_mode == 'avg':
+    if norm_mode == "avg":
         # gather all points together (joint normalization)
         nan_pts1, nnz1 = invalid_to_zeros(pts1, valid1, ndim=3)
         nan_pts2, nnz2 = invalid_to_zeros(pts2, valid2, ndim=3) if pts2 is not None else (None, 0)
@@ -282,22 +281,22 @@ def normalize_pointcloud(pts1, pts2, norm_mode='avg_dis', valid1=None, valid2=No
 
         # compute distance to origin
         all_dis = all_pts.norm(dim=-1)
-        if dis_mode == 'dis':
+        if dis_mode == "dis":
             pass  # do nothing
-        elif dis_mode == 'log1p':
+        elif dis_mode == "log1p":
             all_dis = torch.log1p(all_dis)
-        elif dis_mode == 'warp-log1p':
+        elif dis_mode == "warp-log1p":
             # actually warp input points before normalizing them
             log_dis = torch.log1p(all_dis)
             warp_factor = log_dis / all_dis.clip(min=1e-8)
             H1, W1 = pts1.shape[1:-1]
-            pts1 = pts1 * warp_factor[:, :W1*H1].view(-1, H1, W1, 1)
+            pts1 = pts1 * warp_factor[:, : W1 * H1].view(-1, H1, W1, 1)
             if pts2 is not None:
                 H2, W2 = pts2.shape[1:-1]
-                pts2 = pts2 * warp_factor[:, W1*H1:].view(-1, H2, W2, 1)
+                pts2 = pts2 * warp_factor[:, W1 * H1 :].view(-1, H2, W2, 1)
             all_dis = log_dis  # this is their true distance afterwards
         else:
-            raise ValueError(f'bad {dis_mode=}')
+            raise ValueError(f"bad {dis_mode=}")
 
         norm_factor = all_dis.sum(dim=1) / (nnz1 + nnz2 + 1e-8)
     else:
@@ -309,14 +308,14 @@ def normalize_pointcloud(pts1, pts2, norm_mode='avg_dis', valid1=None, valid2=No
         # compute distance to origin
         all_dis = all_pts.norm(dim=-1)
 
-        if norm_mode == 'avg':
+        if norm_mode == "avg":
             norm_factor = all_dis.nanmean(dim=1)
-        elif norm_mode == 'median':
+        elif norm_mode == "median":
             norm_factor = all_dis.nanmedian(dim=1).values.detach()
-        elif norm_mode == 'sqrt':
-            norm_factor = all_dis.sqrt().nanmean(dim=1)**2
+        elif norm_mode == "sqrt":
+            norm_factor = all_dis.sqrt().nanmean(dim=1) ** 2
         else:
-            raise ValueError(f'bad {norm_mode=}')
+            raise ValueError(f"bad {norm_mode=}")
 
     norm_factor = norm_factor.clip(min=1e-8)
     while norm_factor.ndim < pts1.ndim:
@@ -344,7 +343,9 @@ def get_joint_pointcloud_depth(z1, z2, valid_mask1, valid_mask2=None, quantile=0
 
 
 @torch.no_grad()
-def get_joint_pointcloud_center_scale(pts1, pts2, valid_mask1=None, valid_mask2=None, z_only=False, center=True):
+def get_joint_pointcloud_center_scale(
+    pts1, pts2, valid_mask1=None, valid_mask2=None, z_only=False, center=True
+):
     # set invalid points to NaN
     _pts1 = invalid_to_nans(pts1, valid_mask1).reshape(len(pts1), -1, 3)
     _pts2 = invalid_to_nans(pts2, valid_mask2).reshape(len(pts2), -1, 3) if pts2 is not None else None
@@ -374,12 +375,13 @@ def find_reciprocal_matches(P1, P2):
     _, nn1_in_P2 = tree2.query(P1, workers=8)
     _, nn2_in_P1 = tree1.query(P2, workers=8)
 
-    reciprocal_in_P1 = (nn2_in_P1[nn1_in_P2] == np.arange(len(nn1_in_P2)))
-    reciprocal_in_P2 = (nn1_in_P2[nn2_in_P1] == np.arange(len(nn2_in_P1)))
+    reciprocal_in_P1 = nn2_in_P1[nn1_in_P2] == np.arange(len(nn1_in_P2))
+    reciprocal_in_P2 = nn1_in_P2[nn2_in_P1] == np.arange(len(nn2_in_P1))
     assert reciprocal_in_P1.sum() == reciprocal_in_P2.sum()
     return reciprocal_in_P2, nn2_in_P1, reciprocal_in_P2.sum()
 
 
 def get_med_dist_between_poses(poses):
     from scipy.spatial.distance import pdist
+
     return np.median(pdist([to_numpy(p[:3, 3]) for p in poses]))

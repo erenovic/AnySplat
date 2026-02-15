@@ -32,8 +32,8 @@ class LossOpacity(Loss[LossOpacityCfg, LossOpacityCfgWrapper]):
         global_step: int,
     ) -> Float[Tensor, ""]:
         alpha = prediction.alpha
-        valid_mask = batch['context']['valid_mask'].float()
-        opacity_loss = F.mse_loss(alpha, valid_mask, reduction='none').mean()
+        valid_mask = batch["context"]["valid_mask"].float()
+        opacity_loss = F.mse_loss(alpha, valid_mask, reduction="none").mean()
         # if self.cfg.type == "exp":
         #     opacity_loss = torch.exp(-(gaussians.opacities - 0.5) ** 2 / 0.05).mean()
         # elif self.cfg.type == "mean":

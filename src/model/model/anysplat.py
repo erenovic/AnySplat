@@ -59,9 +59,7 @@ class AnySplat(nn.Module, huggingface_hub.PyTorchModelHubMixin):
 
         for field_name, target_class in conversion_map.items():
             if field_name in cfg_dict:
-                cfg_dict[field_name] = self.convert_nested_config(
-                    cfg_dict[field_name], target_class
-                )
+                cfg_dict[field_name] = self.convert_nested_config(cfg_dict[field_name], target_class)
 
         # Return new instance of the same type
         return type(cfg_obj)(**cfg_dict)
@@ -84,10 +82,7 @@ class AnySplat(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         self.decoder = DecoderSplattingCUDA(decoder_cfg)
 
     @torch.no_grad()
-    def inference(
-        self,
-        context_image: torch.Tensor,
-    ):
+    def inference(self, context_image: torch.Tensor):
         self.encoder.distill = False
         encoder_output = self.encoder(context_image, global_step=0, visualization_dump=None)
         gaussians, pred_context_pose = encoder_output.gaussians, encoder_output.pred_context_pose
@@ -103,9 +98,7 @@ class AnySplat(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     ):
         b, v, c, h, w = context_image.shape
         device = context_image.device
-        encoder_output = self.encoder(
-            context_image, global_step, visualization_dump=visualization_dump
-        )
+        encoder_output = self.encoder(context_image, global_step, visualization_dump=visualization_dump)
         gaussians, pred_context_pose = encoder_output.gaussians, encoder_output.pred_context_pose
         output = self.decoder.forward(
             gaussians,

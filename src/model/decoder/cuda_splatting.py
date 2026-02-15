@@ -25,7 +25,7 @@ def get_projection_matrix(
     """
     tan_fov_x = (0.5 * fov_x).tan()
     tan_fov_y = (0.5 * fov_y).tan()
-    
+
     top = tan_fov_y * near
     bottom = -top
     right = tan_fov_x * near
@@ -61,7 +61,7 @@ def render_cuda(
     voxel_masks: Bool[Tensor, "batch gaussian"] | None = None,
 ) -> tuple[Float[Tensor, "batch 3 height width"], Float[Tensor, "batch height width"]]:
     assert use_sh or gaussian_sh_coefficients.shape[-1] == 1
-    
+
     # Make sure everything is in a range where numerical issues don't appear.
     if scale_invariant:
         scale = 1 / near
@@ -75,19 +75,19 @@ def render_cuda(
     _, _, _, n = gaussian_sh_coefficients.shape
     degree = isqrt(n) - 1
     shs = rearrange(gaussian_sh_coefficients, "b g xyz n -> b g n xyz").contiguous()
-    
+
     b, _, _ = extrinsics.shape
     h, w = image_shape
-    
+
     fov_x, fov_y = get_fov(intrinsics).unbind(dim=-1)
     tan_fov_x = (0.5 * fov_x).tan()
     tan_fov_y = (0.5 * fov_y).tan()
-    
+
     projection_matrix = get_projection_matrix(near, far, fov_x, fov_y)
     projection_matrix = rearrange(projection_matrix, "b i j -> b j i")
     view_matrix = rearrange(extrinsics.inverse(), "b i j -> b j i")
     full_projection = view_matrix @ projection_matrix
-    
+
     all_images = []
     all_radii = []
     all_depths = []
@@ -98,7 +98,7 @@ def render_cuda(
             mean_gradients.retain_grad()
         except Exception:
             pass
-        
+
         settings = GaussianRasterizationSettings(
             image_height=h,
             image_width=w,
@@ -115,9 +115,9 @@ def render_cuda(
             debug=False,
         )
         rasterizer = GaussianRasterizer(settings)
-        
+
         row, col = torch.triu_indices(3, 3)
-        
+
         if voxel_masks is not None:
             voxel_mask = voxel_masks[i]
             image, radii, depth, opacity, n_touched = rasterizer(
@@ -170,7 +170,7 @@ def render_cuda_orthographic(
     _, _, _, n = gaussian_sh_coefficients.shape
     degree = isqrt(n) - 1
     shs = rearrange(gaussian_sh_coefficients, "b g xyz n -> b g n xyz").contiguous()
-    
+
     # Create fake "orthographic" projection by moving the camera back and picking a
     # small field of view.
     fov_x = torch.tensor(fov_degrees, device=extrinsics.device).deg2rad()
@@ -183,7 +183,7 @@ def render_cuda_orthographic(
     move_back = torch.eye(4, dtype=torch.float32, device=extrinsics.device)
     move_back[2, 3] = -distance_to_near
     extrinsics = extrinsics @ move_back
-    
+
     # Escape hatch for visualization/figures.
     if dump is not None:
         dump["extrinsics"] = extrinsics
@@ -192,9 +192,7 @@ def render_cuda_orthographic(
         dump["near"] = near
         dump["far"] = far
 
-    projection_matrix = get_projection_matrix(
-        near, far, repeat(fov_x, "-> b", b=b), fov_y
-    )
+    projection_matrix = get_projection_matrix(near, far, repeat(fov_x, "-> b", b=b), fov_y)
     projection_matrix = rearrange(projection_matrix, "b i j -> b j i")
     view_matrix = rearrange(extrinsics.inverse(), "b i j -> b j i")
     full_projection = view_matrix @ projection_matrix
@@ -208,7 +206,7 @@ def render_cuda_orthographic(
             mean_gradients.retain_grad()
         except Exception:
             pass
-        
+
         settings = GaussianRasterizationSettings(
             image_height=h,
             image_width=w,

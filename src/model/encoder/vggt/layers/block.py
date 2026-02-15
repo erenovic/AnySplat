@@ -46,7 +46,7 @@ class Block(nn.Module):
         rope=None,
     ) -> None:
         super().__init__()
-        
+
         self.norm1 = norm_layer(dim)
 
         self.attn = attn_class(
@@ -77,7 +77,7 @@ class Block(nn.Module):
         self.drop_path2 = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
 
         self.sample_drop_ratio = drop_path
-        
+
     def forward(self, x: Tensor, pos=None) -> Tensor:
         def attn_residual_func(x: Tensor, pos=None) -> Tensor:
             return self.ls1(self.attn(self.norm1(x), pos=pos))
@@ -133,7 +133,9 @@ def drop_add_residual_stochastic_depth(
     residual_scale_factor = b / sample_subset_size
 
     # 3) add the residual
-    x_plus_residual = torch.index_add(x_flat, 0, brange, residual.to(dtype=x.dtype), alpha=residual_scale_factor)
+    x_plus_residual = torch.index_add(
+        x_flat, 0, brange, residual.to(dtype=x.dtype), alpha=residual_scale_factor
+    )
     return x_plus_residual.view_as(x)
 
 
@@ -149,7 +151,9 @@ def add_residual(x, brange, residual, residual_scale_factor, scaling_vector=None
     if scaling_vector is None:
         x_flat = x.flatten(1)
         residual = residual.flatten(1)
-        x_plus_residual = torch.index_add(x_flat, 0, brange, residual.to(dtype=x.dtype), alpha=residual_scale_factor)
+        x_plus_residual = torch.index_add(
+            x_flat, 0, brange, residual.to(dtype=x.dtype), alpha=residual_scale_factor
+        )
     else:
         x_plus_residual = scaled_index_add(
             x, brange, residual.to(dtype=x.dtype), scaling=scaling_vector, alpha=residual_scale_factor
@@ -176,7 +180,9 @@ def get_attn_bias_and_cat(x_list, branges=None):
         attn_bias_cache[all_shapes] = attn_bias
 
     if branges is not None:
-        cat_tensors = index_select_cat([x.flatten(1) for x in x_list], branges).view(1, -1, x_list[0].shape[-1])
+        cat_tensors = index_select_cat([x.flatten(1) for x in x_list], branges).view(
+            1, -1, x_list[0].shape[-1]
+        )
     else:
         tensors_bs1 = tuple(x.reshape([1, -1, *x.shape[2:]]) for x in x_list)
         cat_tensors = torch.cat(tensors_bs1, dim=1)
@@ -202,7 +208,9 @@ def drop_add_residual_stochastic_depth_list(
     residual_list = attn_bias.split(residual_func(x_cat, attn_bias=attn_bias))  # type: ignore
 
     outputs = []
-    for x, brange, residual, residual_scale_factor in zip(x_list, branges, residual_list, residual_scale_factors):
+    for x, brange, residual, residual_scale_factor in zip(
+        x_list, branges, residual_list, residual_scale_factors
+    ):
         outputs.append(add_residual(x, brange, residual, residual_scale_factor, scaling_vector).view_as(x))
     return outputs
 

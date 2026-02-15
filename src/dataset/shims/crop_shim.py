@@ -152,20 +152,14 @@ def rescale_and_crop(
                 depths = torch.stack(depths_new)
             else:
                 depths = depths.reshape(-1, h, w)
-                depths = torch.stack(
-                    [rescale_depth(depth, (h_scaled, w_scaled)) for depth in depths]
-                )
+                depths = torch.stack([rescale_depth(depth, (h_scaled, w_scaled)) for depth in depths])
                 depths = depths.reshape(*batch, h_scaled, w_scaled)
 
             images, intrinsics, depths = center_crop(images, intrinsics, (h_scale, w_scale), depths)
 
             if intr_aug:
-                images = F.resize(
-                    images, size=(h_out, w_out), interpolation=F.InterpolationMode.BILINEAR
-                )
-                depths = F.resize(
-                    depths, size=(h_out, w_out), interpolation=F.InterpolationMode.NEAREST
-                )
+                images = F.resize(images, size=(h_out, w_out), interpolation=F.InterpolationMode.BILINEAR)
+                depths = F.resize(depths, size=(h_out, w_out), interpolation=F.InterpolationMode.NEAREST)
 
             return images, intrinsics, depths
         else:
@@ -177,9 +171,7 @@ def rescale_and_crop(
             return images, intrinsics
 
 
-def apply_crop_shim_to_views(
-    views: AnyViews, shape: tuple[int, int], intr_aug: bool = False
-) -> AnyViews:
+def apply_crop_shim_to_views(views: AnyViews, shape: tuple[int, int], intr_aug: bool = False) -> AnyViews:
     if "depth" in views.keys():
         images, intrinsics, depths = rescale_and_crop(
             views["image"], views["intrinsics"], shape, depths=views["depth"], intr_aug=intr_aug
@@ -199,9 +191,7 @@ def apply_crop_shim_to_views(
         }
 
 
-def apply_crop_shim(
-    example: AnyExample, shape: tuple[int, int], intr_aug: bool = False
-) -> AnyExample:
+def apply_crop_shim(example: AnyExample, shape: tuple[int, int], intr_aug: bool = False) -> AnyExample:
     """Crop images in the example."""
     return {
         **example,

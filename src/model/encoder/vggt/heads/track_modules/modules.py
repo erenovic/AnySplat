@@ -151,7 +151,7 @@ class AttnBlock(nn.Module):
         num_heads,
         attn_class: Callable[..., nn.Module] = nn.MultiheadAttention,
         mlp_ratio=4.0,
-        **block_kwargs
+        **block_kwargs,
     ):
         """
         Self attention block

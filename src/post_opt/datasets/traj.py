@@ -56,7 +56,7 @@ def generate_spiral_path(
     near_bound = bounds.min()
     far_bound = bounds.max()
     # All cameras will point towards the world space point (0, 0, -focal).
-    focal = 1 / (((1 - focus_distance) / near_bound + focus_distance / far_bound))
+    focal = 1 / ((1 - focus_distance) / near_bound + focus_distance / far_bound)
     focal = focal * spiral_scale_f
 
     # Get radii for spiral path using 90th percentile of camera positions.
@@ -109,12 +109,7 @@ def generate_ellipse_path_z(
             [
                 low[0] + (high - low)[0] * (np.cos(theta) * 0.5 + 0.5),
                 low[1] + (high - low)[1] * (np.sin(theta) * 0.5 + 0.5),
-                variation
-                * (
-                    z_low[2]
-                    + (z_high - z_low)[2]
-                    * (np.cos(theta + 2 * np.pi * phase) * 0.5 + 0.5)
-                )
+                variation * (z_low[2] + (z_high - z_low)[2] * (np.cos(theta + 2 * np.pi * phase) * 0.5 + 0.5))
                 + height,
             ],
             -1,
@@ -170,12 +165,7 @@ def generate_ellipse_path_y(
         return np.stack(
             [
                 low[0] + (high - low)[0] * (np.cos(theta) * 0.5 + 0.5),
-                variation
-                * (
-                    y_low[1]
-                    + (y_high - y_low)[1]
-                    * (np.cos(theta + 2 * np.pi * phase) * 0.5 + 0.5)
-                )
+                variation * (y_low[1] + (y_high - y_low)[1] * (np.cos(theta + 2 * np.pi * phase) * 0.5 + 0.5))
                 + height,
                 low[2] + (high - low)[2] * (np.sin(theta) * 0.5 + 0.5),
             ],
@@ -248,7 +238,5 @@ def generate_interpolated_path(
         return new_points
 
     points = poses_to_points(poses, dist=rot_weight)
-    new_points = interp(
-        points, n_interp * (points.shape[0] - 1), k=spline_degree, s=smoothness
-    )
+    new_points = interp(points, n_interp * (points.shape[0] - 1), k=spline_degree, s=smoothness)
     return points_to_poses(new_points)

@@ -12,6 +12,7 @@ from tqdm import tqdm
 from typing_extensions import assert_never
 
 import sys
+
 sys.path.append("/cpfs01/user/jianglihan/projects/gsplat/examples/datasets")
 sys.path.append("/cpfs01/user/jianglihan/projects/gsplat/examples")
 sys.path.append("/cpfs01/user/jianglihan/projects/gsplat")
@@ -41,9 +42,7 @@ def _resize_image_folder(image_dir: str, resized_dir: str, factor: int) -> str:
     image_files = _get_rel_paths(image_dir)
     for image_file in tqdm(image_files):
         image_path = os.path.join(image_dir, image_file)
-        resized_path = os.path.join(
-            resized_dir, os.path.splitext(image_file)[0] + ".png"
-        )
+        resized_path = os.path.join(resized_dir, os.path.splitext(image_file)[0] + ".png")
         if os.path.isfile(resized_path):
             continue
         image = imageio.imread(image_path)[..., :3]
@@ -51,9 +50,7 @@ def _resize_image_folder(image_dir: str, resized_dir: str, factor: int) -> str:
             int(round(image.shape[1] / factor)),
             int(round(image.shape[0] / factor)),
         )
-        resized_image = np.array(
-            Image.fromarray(image).resize(resized_size, Image.BICUBIC)
-        )
+        resized_image = np.array(Image.fromarray(image).resize(resized_size, Image.BICUBIC))
         imageio.imwrite(resized_path, resized_image)
     return resized_dir
 
@@ -73,20 +70,16 @@ class Parser:
         self.normalize = normalize
         self.test_every = test_every
 
-
-
         colmap_dir = os.path.join(data_dir, "sparse/0/")
         if not os.path.exists(colmap_dir):
             colmap_dir = os.path.join(data_dir, "sparse")
-        assert os.path.exists(
-            colmap_dir
-        ), f"COLMAP directory {colmap_dir} does not exist."
+        assert os.path.exists(colmap_dir), f"COLMAP directory {colmap_dir} does not exist."
 
         manager = SceneManager(colmap_dir)
         manager.load_cameras()
         manager.load_images()
         manager.load_points3D()
-        
+
         # Extract extrinsic matrices in world-to-camera format.
         imdata = manager.images
         w2c_mats = []
@@ -134,17 +127,15 @@ class Parser:
             elif type_ == 5 or type_ == "OPENCV_FISHEYE":
                 params = np.array([cam.k1, cam.k2, cam.k3, cam.k4], dtype=np.float32)
                 camtype = "fisheye"
-            assert (
-                camtype == "perspective" or camtype == "fisheye"
-            ), f"Only perspective and fisheye cameras are supported, got {type_}"
+            assert camtype == "perspective" or camtype == "fisheye", (
+                f"Only perspective and fisheye cameras are supported, got {type_}"
+            )
 
             params_dict[camera_id] = params
             imsize_dict[camera_id] = (cam.width // factor, cam.height // factor)
             mask_dict[camera_id] = None
-        print(
-            f"[Parser] {len(imdata)} images, taken by {len(set(camera_ids))} cameras."
-        )
-        
+        print(f"[Parser] {len(imdata)} images, taken by {len(set(camera_ids))} cameras.")
+
         if len(imdata) == 0:
             raise ValueError("No images found in COLMAP.")
         if not (type_ == 0 or type_ == 1):
@@ -198,9 +189,7 @@ class Parser:
         colmap_files = sorted(_get_rel_paths(colmap_image_dir))
         image_files = sorted(_get_rel_paths(image_dir))
         if factor > 1 and os.path.splitext(image_files[0])[1].lower() == ".jpg":
-            image_dir = _resize_image_folder(
-                colmap_image_dir, image_dir + "_png", factor=factor
-            )
+            image_dir = _resize_image_folder(colmap_image_dir, image_dir + "_png", factor=factor)
             image_files = sorted(_get_rel_paths(image_dir))
         colmap_to_image = dict(zip(colmap_files, image_files))
         image_paths = [os.path.join(image_dir, colmap_to_image[f]) for f in image_names]
@@ -217,9 +206,7 @@ class Parser:
                 image_name = image_id_to_name[image_id]
                 point_idx = manager.point3D_id_to_point3D_idx[point_id]
                 point_indices.setdefault(image_name, []).append(point_idx)
-        point_indices = {
-            k: np.array(v).astype(np.int32) for k, v in point_indices.items()
-        }
+        point_indices = {k: np.array(v).astype(np.int32) for k, v in point_indices.items()}
 
         # Normalize the world space.
         if normalize:
@@ -288,16 +275,12 @@ class Parser:
             if len(params) == 0:
                 continue  # no distortion
             assert camera_id in self.Ks_dict, f"Missing K for camera {camera_id}"
-            assert (
-                camera_id in self.params_dict
-            ), f"Missing params for camera {camera_id}"
+            assert camera_id in self.params_dict, f"Missing params for camera {camera_id}"
             K = self.Ks_dict[camera_id]
             width, height = self.imsize_dict[camera_id]
 
             if camtype == "perspective":
-                K_undist, roi_undist = cv2.getOptimalNewCameraMatrix(
-                    K, params, (width, height), 0
-                )
+                K_undist, roi_undist = cv2.getOptimalNewCameraMatrix(K, params, (width, height), 0)
                 mapx, mapy = cv2.initUndistortRectifyMap(
                     K, params, None, K_undist, (width, height), cv2.CV_32FC1
                 )
@@ -384,7 +367,7 @@ class Dataset:
         #     self.indices = indices[indices % self.parser.test_every != 0]
         # else:
         #     self.indices = indices[indices % self.parser.test_every == 0]
-        
+
         # if split == "train":
         #     self.images = np.load(os.path.join(self.parser.true_data_dir, "context_image.npy"))
         #     self.camtoworlds = np.load(os.path.join(self.parser.true_data_dir, "context_extrinsic.npy"))
@@ -407,7 +390,7 @@ class Dataset:
 
     def __getitem__(self, item: int) -> Dict[str, Any]:
         index = self.indices[item]
-        image = (self.images[index]*255.0).transpose(1, 2, 0).astype(np.uint8) # (H, W, 3)
+        image = (self.images[index] * 255.0).transpose(1, 2, 0).astype(np.uint8)  # (H, W, 3)
         K = self.Ks[index].copy()  # undistorted K
         params = None
         camtoworlds = self.camtoworlds[index]
@@ -464,17 +447,21 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_dir", type=str, default="data/mipnerf360/garden")
-    parser.add_argument("--true_data_dir", type=str, default="/cpfs01/user/jianglihan/projects/anysplat_baselines/demo_data/infer_output/3F_100view/room5")
+    parser.add_argument(
+        "--true_data_dir",
+        type=str,
+        default="/cpfs01/user/jianglihan/projects/anysplat_baselines/demo_data/infer_output/3F_100view/room5",
+    )
     parser.add_argument("--factor", type=int, default=4)
     args = parser.parse_args()
 
     # Parse COLMAP data.
     parser = Parser(
-        data_dir=args.data_dir, 
+        data_dir=args.data_dir,
         true_data_dir=args.true_data_dir,
-        factor=args.factor, 
-        normalize=True, 
-        test_every=8
+        factor=args.factor,
+        normalize=True,
+        test_every=8,
     )
     dataset = Dataset(parser, split="train", load_depths=True)
     print(f"Dataset: {len(dataset)} images.")

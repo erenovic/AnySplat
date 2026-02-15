@@ -39,9 +39,7 @@ class CameraOptModule(torch.nn.Module):
         batch_shape = camtoworlds.shape[:-2]
         pose_deltas = self.embeds(embed_ids)  # (..., 9)
         dx, drot = pose_deltas[..., :3], pose_deltas[..., 3:]
-        rot = rotation_6d_to_matrix(
-            drot + self.identity.expand(*batch_shape, -1)
-        )  # (..., 3, 3)
+        rot = rotation_6d_to_matrix(drot + self.identity.expand(*batch_shape, -1))  # (..., 3, 3)
         transform = torch.eye(4, device=pose_deltas.device).repeat((*batch_shape, 1, 1))
         transform[..., :3, :3] = rot
         transform[..., :3, 3] = dx
@@ -65,9 +63,7 @@ class AppearanceOptModule(torch.nn.Module):
         self.sh_degree = sh_degree
         self.embeds = torch.nn.Embedding(n, embed_dim)
         layers = []
-        layers.append(
-            torch.nn.Linear(embed_dim + feature_dim + (sh_degree + 1) ** 2, mlp_width)
-        )
+        layers.append(torch.nn.Linear(embed_dim + feature_dim + (sh_degree + 1) ** 2, mlp_width))
         layers.append(torch.nn.ReLU(inplace=True))
         for _ in range(mlp_depth - 1):
             layers.append(torch.nn.Linear(mlp_width, mlp_width))
@@ -75,9 +71,7 @@ class AppearanceOptModule(torch.nn.Module):
         layers.append(torch.nn.Linear(mlp_width, 3))
         self.color_head = torch.nn.Sequential(*layers)
 
-    def forward(
-        self, features: Tensor, embed_ids: Tensor, dirs: Tensor, sh_degree: int
-    ) -> Tensor:
+    def forward(self, features: Tensor, embed_ids: Tensor, dirs: Tensor, sh_degree: int) -> Tensor:
         """Adjust appearance based on embeddings.
 
         Args:

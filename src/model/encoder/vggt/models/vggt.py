@@ -17,13 +17,17 @@ from src.model.encoder.vggt.heads.track_head import TrackHead
 class VGGT(nn.Module, PyTorchModelHubMixin):
     def __init__(self, img_size=518, patch_size=14, embed_dim=1024):
         super().__init__()
-        
+
         self.aggregator = Aggregator(img_size=img_size, patch_size=patch_size, embed_dim=embed_dim)
         self.camera_head = CameraHead(dim_in=2 * embed_dim)
-        self.point_head = DPTHead(dim_in=2 * embed_dim, output_dim=4, activation="inv_log", conf_activation="expp1")
-        self.depth_head = DPTHead(dim_in=2 * embed_dim, output_dim=2, activation="exp", conf_activation="expp1")
+        self.point_head = DPTHead(
+            dim_in=2 * embed_dim, output_dim=4, activation="inv_log", conf_activation="expp1"
+        )
+        self.depth_head = DPTHead(
+            dim_in=2 * embed_dim, output_dim=2, activation="exp", conf_activation="expp1"
+        )
         self.track_head = TrackHead(dim_in=2 * embed_dim, patch_size=patch_size)
-        
+
     def forward(
         self,
         images: torch.Tensor,
@@ -85,7 +89,10 @@ class VGGT(nn.Module, PyTorchModelHubMixin):
 
         if self.track_head is not None and query_points is not None:
             track_list, vis, conf = self.track_head(
-                aggregated_tokens_list, images=images, patch_start_idx=patch_start_idx, query_points=query_points
+                aggregated_tokens_list,
+                images=images,
+                patch_start_idx=patch_start_idx,
+                query_points=query_points,
             )
             predictions["track"] = track_list[-1]  # track of the last iteration
             predictions["vis"] = vis

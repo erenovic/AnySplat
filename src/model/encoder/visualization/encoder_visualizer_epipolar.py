@@ -28,9 +28,7 @@ def box(
     return add_border(add_border(image), 1, 0)
 
 
-class EncoderVisualizerEpipolar(
-    EncoderVisualizer[EncoderVisualizerEpipolarCfg, EncoderEpipolar]
-):
+class EncoderVisualizerEpipolar(EncoderVisualizer[EncoderVisualizerEpipolarCfg, EncoderEpipolar]):
     def visualize(
         self,
         context: BatchedViews,
@@ -161,9 +159,7 @@ class EncoderVisualizerEpipolar(
         )
 
         # Visualize attention in the sample view.
-        attention = rearrange(
-            attention, "l (b v r) hd () s -> l b v r hd s", b=b, v=v, r=r
-        )
+        attention = rearrange(attention, "l (b v r) hd () s -> l b v r hd s", b=b, v=v, r=r)
         attention = attention[:, rb, rv, rr, :, :]
         num_layers, _, hd, _ = attention.shape
 
@@ -181,12 +177,8 @@ class EncoderVisualizerEpipolar(
                 # Draw the alternating bucket lines.
                 vis_layer_head = draw_lines(
                     context_images[rb, self.encoder.sampler.index_v[rv, rov]],
-                    rearrange(
-                        sampling.xy_sample_near[rb, rv, rov, rr], "r s xy -> (r s) xy"
-                    ),
-                    rearrange(
-                        sampling.xy_sample_far[rb, rv, rov, rr], "r s xy -> (r s) xy"
-                    ),
+                    rearrange(sampling.xy_sample_near[rb, rv, rov, rr], "r s xy -> (r s) xy"),
+                    rearrange(sampling.xy_sample_far[rb, rv, rov, rr], "r s xy -> (r s) xy"),
                     color,
                     3,
                     cap="butt",
@@ -275,9 +267,7 @@ class EncoderVisualizerEpipolar(
         b, v, _, h, w = context_images.shape
         rb = randrange(b)
         context_images = context_images[rb]
-        opacities = repeat(
-            opacities[rb], "(v h w spp) -> spp v c h w", v=v, c=3, h=h, w=w
-        )
+        opacities = repeat(opacities[rb], "(v h w spp) -> spp v c h w", v=v, c=3, h=h, w=w)
         colors = rearrange(colors[rb], "(v h w spp) c -> spp v c h w", v=v, h=h, w=w)
 
         # Color-map Gaussian covariawnces.
@@ -289,9 +279,7 @@ class EncoderVisualizerEpipolar(
             hcat(
                 add_label(box(hcat(*context_images)), "Context"),
                 add_label(box(vcat(*[hcat(*x) for x in opacities])), "Opacities"),
-                add_label(
-                    box(vcat(*[hcat(*x) for x in (colors * opacities)])), "Colors"
-                ),
+                add_label(box(vcat(*[hcat(*x) for x in (colors * opacities)])), "Colors"),
                 add_label(box(vcat(*[hcat(*x) for x in colors])), "Colors (Raw)"),
                 add_label(box(vcat(*[hcat(*x) for x in det])), "Determinant"),
             )
@@ -457,9 +445,7 @@ class EncoderVisualizerEpipolar(
             y_range=(0, 1),
         )
 
-        return add_border(
-            hcat(add_label(ray_view, "Ray View"), add_label(sample_view, "Sample View"))
-        )
+        return add_border(hcat(add_label(ray_view, "Ray View"), add_label(sample_view, "Sample View")))
 
     def visualize_epipolar_color_samples(
         self,
@@ -521,6 +507,4 @@ class EncoderVisualizerEpipolar(
             y_range=(0, 1),
         )
 
-        return add_border(
-            hcat(add_label(ray_view, "Ray View"), add_label(sample_view, "Sample View"))
-        )
+        return add_border(hcat(add_label(ray_view, "Ray View"), add_label(sample_view, "Sample View")))

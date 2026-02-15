@@ -92,12 +92,12 @@ class DinoVisionTransformer(nn.Module):
         """
         super().__init__()
         norm_layer = partial(nn.LayerNorm, eps=1e-6)
-        
+
         # tricky but makes it work
         self.use_checkpoint = True
         self.use_reentrant = False
         #
-        
+
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
         self.num_tokens = 1
         self.n_blocks = depth
@@ -107,7 +107,9 @@ class DinoVisionTransformer(nn.Module):
         self.interpolate_antialias = interpolate_antialias
         self.interpolate_offset = interpolate_offset
 
-        self.patch_embed = embed_layer(img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
+        self.patch_embed = embed_layer(
+            img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim
+        )
         num_patches = self.patch_embed.num_patches
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -238,7 +240,7 @@ class DinoVisionTransformer(nn.Module):
 
     def forward_features_list(self, x_list, masks_list):
         x = [self.prepare_tokens_with_masks(x, masks) for x, masks in zip(x_list, masks_list)]
-    
+
         for blk in self.blocks:
             if self.use_checkpoint:
                 x = checkpoint(blk, x, use_reentrant=self.use_reentrant)
@@ -326,7 +328,9 @@ class DinoVisionTransformer(nn.Module):
         if reshape:
             B, _, w, h = x.shape
             outputs = [
-                out.reshape(B, w // self.patch_size, h // self.patch_size, -1).permute(0, 3, 1, 2).contiguous()
+                out.reshape(B, w // self.patch_size, h // self.patch_size, -1)
+                .permute(0, 3, 1, 2)
+                .contiguous()
                 for out in outputs
             ]
         if return_class_token:

@@ -262,9 +262,7 @@ class ModelWrapper(LightningModule):
 
             if distill_infos is not None:
                 # distill ctx pred_pose & depth & normal
-                loss_distill_list = self.loss_distill(
-                    distill_infos, pred_pose_enc_list, output, batch
-                )
+                loss_distill_list = self.loss_distill(distill_infos, pred_pose_enc_list, output, batch)
                 self.log("loss/distill", loss_distill_list["loss_distill"])
                 self.log("loss/distill_pose", loss_distill_list["loss_pose"])
                 self.log("loss/distill_depth", loss_distill_list["loss_depth"])
@@ -402,9 +400,7 @@ class ModelWrapper(LightningModule):
                 torch.zeros([b, v, 3], requires_grad=True, device=output_c2ws.device)
             )
             opt_params = []
-            self.register_buffer(
-                "identity", torch.tensor([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]).to(output_c2ws)
-            )
+            self.register_buffer("identity", torch.tensor([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]).to(output_c2ws))
             opt_params.append(
                 {
                     "params": [cam_rot_delta],
@@ -423,9 +419,7 @@ class ModelWrapper(LightningModule):
                 for _ in range(self.test_cfg.pose_align_steps):
                     pose_optimizer.zero_grad()
                     dx, drot = cam_trans_delta, cam_rot_delta
-                    rot = rotation_6d_to_matrix(
-                        drot + self.identity.expand(b, v, -1)
-                    )  # (..., 3, 3)
+                    rot = rotation_6d_to_matrix(drot + self.identity.expand(b, v, -1))  # (..., 3, 3)
 
                     transform = torch.eye(4, device=extrinsics.device).repeat((b, v, 1, 1))
                     transform[..., :3, :3] = rot
@@ -559,9 +553,9 @@ class ModelWrapper(LightningModule):
         model_depth_pred = vis_depth_map(model_depth_pred)
 
         render_normal = (
-            get_normal_map(
-                output.depth.flatten(0, 1), batch["context"]["intrinsics"].flatten(0, 1)
-            ).permute(0, 3, 1, 2)
+            get_normal_map(output.depth.flatten(0, 1), batch["context"]["intrinsics"].flatten(0, 1)).permute(
+                0, 3, 1, 2
+            )
             + 1
         ) / 2.0
         pred_normal = (
@@ -624,9 +618,7 @@ class ModelWrapper(LightningModule):
         # )
 
         if self.encoder_visualizer is not None:
-            for k, image in self.encoder_visualizer.visualize(
-                batch["context"], self.global_step
-            ).items():
+            for k, image in self.encoder_visualizer.visualize(batch["context"], self.global_step).items():
                 self.logger.log_image(k, [prep_image(image)], step=self.global_step)
 
         # Run video validation step.
@@ -667,20 +659,12 @@ class ModelWrapper(LightningModule):
         def trajectory_fn(t):
             extrinsics = interpolate_extrinsics(
                 batch["context"]["extrinsics"][0, 0],
-                (
-                    batch["context"]["extrinsics"][0, 1]
-                    if v == 2
-                    else batch["target"]["extrinsics"][0, 0]
-                ),
+                (batch["context"]["extrinsics"][0, 1] if v == 2 else batch["target"]["extrinsics"][0, 0]),
                 t,
             )
             intrinsics = interpolate_intrinsics(
                 batch["context"]["intrinsics"][0, 0],
-                (
-                    batch["context"]["intrinsics"][0, 1]
-                    if v == 2
-                    else batch["target"]["intrinsics"][0, 0]
-                ),
+                (batch["context"]["intrinsics"][0, 1] if v == 2 else batch["target"]["intrinsics"][0, 0]),
                 t,
             )
             return extrinsics[None], intrinsics[None]
@@ -706,20 +690,12 @@ class ModelWrapper(LightningModule):
             )
             extrinsics = interpolate_extrinsics(
                 batch["context"]["extrinsics"][0, 0],
-                (
-                    batch["context"]["extrinsics"][0, 1]
-                    if v == 2
-                    else batch["target"]["extrinsics"][0, 0]
-                ),
+                (batch["context"]["extrinsics"][0, 1] if v == 2 else batch["target"]["extrinsics"][0, 0]),
                 t * 5 - 2,
             )
             intrinsics = interpolate_intrinsics(
                 batch["context"]["intrinsics"][0, 0],
-                (
-                    batch["context"]["intrinsics"][0, 1]
-                    if v == 2
-                    else batch["target"]["intrinsics"][0, 0]
-                ),
+                (batch["context"]["intrinsics"][0, 1] if v == 2 else batch["target"]["intrinsics"][0, 0]),
                 t * 5 - 2,
             )
             return extrinsics @ tf, intrinsics[None]
@@ -758,9 +734,7 @@ class ModelWrapper(LightningModule):
         # TODO: Interpolate near and far planes?
         near = repeat(batch["context"]["near"][:, 0], "b -> b v", v=num_frames)
         far = repeat(batch["context"]["far"][:, 0], "b -> b v", v=num_frames)
-        output = self.model.decoder.forward(
-            gaussians, extrinsics, intrinsics, near, far, (h, w), "depth"
-        )
+        output = self.model.decoder.forward(gaussians, extrinsics, intrinsics, near, far, (h, w), "depth")
         images = [
             vcat(rgb, depth)
             for rgb, depth in zip(output.color[0], vis_depth_map(output.depth[0]), strict=True)

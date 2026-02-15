@@ -12,6 +12,7 @@ import torch.nn.functional as F
 import numpy as np
 import pycolmap
 
+
 # TODO: frame_idx should start from 1 instead of 0 in colmap
 def batch_matrix_to_pycolmap(
     points3d,
@@ -46,8 +47,10 @@ def batch_matrix_to_pycolmap(
     assert len(points3d) == P
     assert image_size.shape[0] == 2
 
-    projected_points_2d, projected_points_cam = project_3D_points(points3d, extrinsics, intrinsics, return_points_cam=True)
-    projected_diff = (projected_points_2d - tracks).norm(dim=-1)    
+    projected_points_2d, projected_points_cam = project_3D_points(
+        points3d, extrinsics, intrinsics, return_points_cam=True
+    )
+    projected_diff = (projected_points_2d - tracks).norm(dim=-1)
     projected_points_2d[projected_points_cam[:, -1] <= 0] = 1e6
     reproj_mask = projected_diff < max_reproj_error
 
@@ -61,7 +64,6 @@ def batch_matrix_to_pycolmap(
 
     if extra_params is not None:
         extra_params = extra_params.cpu().numpy()
-
 
     tracks = tracks.cpu().numpy()
     points3d = points3d.cpu().numpy()
@@ -78,9 +80,7 @@ def batch_matrix_to_pycolmap(
 
     # Only add 3D points that have sufficient 2D points
     for vidx in valid_idx:
-        reconstruction.add_point3D(
-            points3d[vidx], pycolmap.Track(), np.zeros(3)
-        )
+        reconstruction.add_point3D(points3d[vidx], pycolmap.Track(), np.zeros(3))
 
     num_points3D = len(valid_idx)
 
@@ -109,9 +109,7 @@ def batch_matrix_to_pycolmap(
                     ]
                 )
             else:
-                raise ValueError(
-                    f"Camera type {camera_type} is not supported yet"
-                )
+                raise ValueError(f"Camera type {camera_type} is not supported yet")
 
             camera = pycolmap.Camera(
                 model=camera_type,
@@ -143,17 +141,13 @@ def batch_matrix_to_pycolmap(
         for point3D_id in range(1, num_points3D + 1):
             original_track_idx = valid_idx[point3D_id - 1]
 
-            if (
-                reconstruction.points3D[point3D_id].xyz < max_points3D_val
-            ).all():
+            if (reconstruction.points3D[point3D_id].xyz < max_points3D_val).all():
                 if masks[fidx][original_track_idx]:
                     # It seems we don't need +0.5 for BA
                     point2D_xy = tracks[fidx][original_track_idx]
                     # Please note when adding the Point2D object
                     # It not only requires the 2D xy location, but also the id to 3D point
-                    points2D_list.append(
-                        pycolmap.Point2D(point2D_xy, point3D_id)
-                    )
+                    points2D_list.append(pycolmap.Point2D(point2D_xy, point3D_id))
 
                     # add element
                     track = reconstruction.points3D[point3D_id].track
@@ -175,9 +169,7 @@ def batch_matrix_to_pycolmap(
     return reconstruction
 
 
-def pycolmap_to_batch_matrix(
-    reconstruction, device="cuda", camera_type="SIMPLE_PINHOLE"
-):
+def pycolmap_to_batch_matrix(reconstruction, device="cuda", camera_type="SIMPLE_PINHOLE"):
     """
     Convert a PyCOLMAP Reconstruction Object to batched PyTorch tensors.
 
@@ -229,9 +221,6 @@ def pycolmap_to_batch_matrix(
     return points3D, extrinsics, intrinsics, extra_params
 
 
-
-
-
 def project_3D_points(
     points3D,
     extrinsics,
@@ -254,19 +243,13 @@ def project_3D_points(
     with torch.cuda.amp.autocast(dtype=torch.double):
         N = points3D.shape[0]  # Number of points
         B = extrinsics.shape[0]  # Batch size, i.e., number of cameras
-        points3D_homogeneous = torch.cat(
-            [points3D, torch.ones_like(points3D[..., 0:1])], dim=1
-        )  # Nx4
+        points3D_homogeneous = torch.cat([points3D, torch.ones_like(points3D[..., 0:1])], dim=1)  # Nx4
         # Reshape for batch processing
-        points3D_homogeneous = points3D_homogeneous.unsqueeze(0).expand(
-            B, -1, -1
-        )  # BxNx4
+        points3D_homogeneous = points3D_homogeneous.unsqueeze(0).expand(B, -1, -1)  # BxNx4
 
         # Step 1: Apply extrinsic parameters
         # Transform 3D points to camera coordinate system for all cameras
-        points_cam = torch.bmm(
-            extrinsics, points3D_homogeneous.transpose(-1, -2)
-        )
+        points_cam = torch.bmm(extrinsics, points3D_homogeneous.transpose(-1, -2))
 
         if only_points_cam:
             return points_cam
@@ -304,9 +287,7 @@ def img_from_cam(intrinsics, points_cam, extra_params=None, default=0.0):
         uv = torch.stack([uu, vv], dim=1)
 
     # Prepare points_cam for batch matrix multiplication
-    points_cam_homo = torch.cat(
-        (uv, torch.ones_like(uv[:, :1, :])), dim=1
-    )  # Bx3xN
+    points_cam_homo = torch.cat((uv, torch.ones_like(uv[:, :1, :])), dim=1)  # Bx3xN
     # Apply intrinsic parameters using batch matrix multiplication
     points2D_homo = torch.bmm(intrinsics, points_cam_homo)  # Bx3xN
 
@@ -317,4 +298,3 @@ def img_from_cam(intrinsics, points_cam, extra_params=None, default=0.0):
     points2D = torch.nan_to_num(points2D, nan=default)
 
     return points2D.transpose(1, 2)  # BxNx2
-

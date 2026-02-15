@@ -15,7 +15,9 @@ import torch.nn.functional as F
 from typing import Optional, Tuple, Union
 
 
-def get_2d_sincos_pos_embed(embed_dim: int, grid_size: Union[int, Tuple[int, int]], return_grid=False) -> torch.Tensor:
+def get_2d_sincos_pos_embed(
+    embed_dim: int, grid_size: Union[int, Tuple[int, int]], return_grid=False
+) -> torch.Tensor:
     """
     This function initializes a grid and generates a 2D positional embedding using sine and cosine functions.
     It is a wrapper of get_2d_sincos_pos_embed_from_grid.
@@ -107,7 +109,9 @@ def get_2d_embedding(xy: torch.Tensor, C: int, cat_coords: bool = True) -> torch
 
     x = xy[:, :, 0:1]
     y = xy[:, :, 1:2]
-    div_term = (torch.arange(0, C, 2, device=xy.device, dtype=torch.float32) * (1000.0 / C)).reshape(1, 1, int(C / 2))
+    div_term = (torch.arange(0, C, 2, device=xy.device, dtype=torch.float32) * (1000.0 / C)).reshape(
+        1, 1, int(C / 2)
+    )
 
     pe_x = torch.zeros(B, N, C, device=xy.device, dtype=torch.float32)
     pe_y = torch.zeros(B, N, C, device=xy.device, dtype=torch.float32)

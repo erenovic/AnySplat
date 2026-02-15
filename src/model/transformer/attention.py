@@ -28,9 +28,7 @@ from torch import nn
 
 
 class Attention(nn.Module):
-    def __init__(
-        self, dim, heads=8, dim_head=64, dropout=0.0, selfatt=True, kv_dim=None
-    ):
+    def __init__(self, dim, heads=8, dim_head=64, dropout=0.0, selfatt=True, kv_dim=None):
         super().__init__()
         inner_dim = dim_head * heads
         project_out = not (heads == 1 and dim_head == dim)
@@ -46,9 +44,7 @@ class Attention(nn.Module):
             self.to_kv = nn.Linear(kv_dim, inner_dim * 2, bias=False)
 
         self.to_out = (
-            nn.Sequential(nn.Linear(inner_dim, dim), nn.Dropout(dropout))
-            if project_out
-            else nn.Identity()
+            nn.Sequential(nn.Linear(inner_dim, dim), nn.Dropout(dropout)) if project_out else nn.Identity()
         )
 
     def forward(self, x, z=None):

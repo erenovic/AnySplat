@@ -9,8 +9,8 @@ import torch.nn.functional as F
 from .postprocess import postprocess
 
 
-class LinearPts3d (nn.Module):
-    """ 
+class LinearPts3d(nn.Module):
+    """
     Linear head for dust3r
     Each token outputs: - 16x16 3D points (+ confidence)
     """
@@ -22,8 +22,8 @@ class LinearPts3d (nn.Module):
         self.conf_mode = net.conf_mode
         self.has_conf = has_conf
 
-        self.proj = nn.Linear(net.dec_embed_dim, (3 + has_conf)*self.patch_size**2)
-    
+        self.proj = nn.Linear(net.dec_embed_dim, (3 + has_conf) * self.patch_size**2)
+
     def setup(self, croconet):
         pass
 
@@ -34,7 +34,7 @@ class LinearPts3d (nn.Module):
 
         # extract 3D points
         feat = self.proj(tokens)  # B,S,D
-        feat = feat.transpose(-1, -2).view(B, -1, H//self.patch_size, W//self.patch_size)
+        feat = feat.transpose(-1, -2).view(B, -1, H // self.patch_size, W // self.patch_size)
         feat = F.pixel_shuffle(feat, self.patch_size)  # B,3,H,W
 
         # permute + norm depth
@@ -54,7 +54,9 @@ class LinearGS(nn.Module):
         self.conf_mode = net.conf_mode
         self.has_conf = has_conf
 
-        self.proj = nn.Linear(net.dec_embed_dim, (2 + 1 + net.gaussian_adapter.d_in)*self.patch_size**2)  # 2 for xy offset, 1 for opacity
+        self.proj = nn.Linear(
+            net.dec_embed_dim, (2 + 1 + net.gaussian_adapter.d_in) * self.patch_size**2
+        )  # 2 for xy offset, 1 for opacity
 
     def setup(self, croconet):
         pass
@@ -66,7 +68,7 @@ class LinearGS(nn.Module):
 
         # extract 3D points
         feat = self.proj(tokens)  # B,S,D
-        feat = feat.transpose(-1, -2).view(B, -1, H//self.patch_size, W//self.patch_size)
+        feat = feat.transpose(-1, -2).view(B, -1, H // self.patch_size, W // self.patch_size)
         feat = F.pixel_shuffle(feat, self.patch_size)  # B,3,H,W
 
         # permute + norm depth

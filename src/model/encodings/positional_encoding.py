@@ -14,7 +14,7 @@ class PositionalEncoding(nn.Module):
     def __init__(self, num_octaves: int):
         super().__init__()
         octaves = torch.arange(num_octaves).float()
-        
+
         # The lowest frequency has a period of 1.
         frequencies = 2 * torch.pi * 2**octaves
         frequencies = repeat(frequencies, "f -> f p", p=2)

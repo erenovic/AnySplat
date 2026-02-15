@@ -11,17 +11,16 @@ from .dpt_head import create_dpt_head
 
 
 def head_factory(head_type, output_mode, net, has_conf=False, out_nchan=3):
-    """" build a prediction head for the decoder
-    """
-    if head_type == 'linear' and output_mode == 'pts3d':
+    """ " build a prediction head for the decoder"""
+    if head_type == "linear" and output_mode == "pts3d":
         return LinearPts3d(net, has_conf)
-    elif head_type == 'dpt' and output_mode == 'pts3d':
+    elif head_type == "dpt" and output_mode == "pts3d":
         return create_dpt_head(net, has_conf=has_conf)
-    elif head_type == 'dpt' and output_mode == 'gs_params':
+    elif head_type == "dpt" and output_mode == "gs_params":
         return create_dpt_head(net, has_conf=False, out_nchan=out_nchan, postprocess_func=None)
-    elif head_type == 'dpt_gs' and output_mode == 'gs_params':
+    elif head_type == "dpt_gs" and output_mode == "gs_params":
         return create_gs_dpt_head(net, has_conf=False, out_nchan=out_nchan, postprocess_func=None)
-    elif head_type == 'linear' and output_mode == 'ga_params':
+    elif head_type == "linear" and output_mode == "ga_params":
         return create_gs_linear_head(net, has_conf=False, out_nchan=out_nchan, postprocess_func=None)
     else:
         raise NotImplementedError(f"unexpected {head_type=} and {output_mode=}")

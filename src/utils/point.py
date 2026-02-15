@@ -1,6 +1,7 @@
 import torch
 from torch import Tensor
 
+
 def get_normal_map(depth_map: torch.Tensor, intrinsic: torch.Tensor) -> torch.Tensor:
     """
     Convert a depth map to camera coordinates.
@@ -14,7 +15,9 @@ def get_normal_map(depth_map: torch.Tensor, intrinsic: torch.Tensor) -> torch.Te
     """
     B, H, W = depth_map.shape
     assert intrinsic.shape == (B, 3, 3), "Intrinsic matrix must be Bx3x3"
-    assert (intrinsic[:, 0, 1] == 0).all() and (intrinsic[:, 1, 0] == 0).all(), "Intrinsic matrix must have zero skew"
+    assert (intrinsic[:, 0, 1] == 0).all() and (intrinsic[:, 1, 0] == 0).all(), (
+        "Intrinsic matrix must have zero skew"
+    )
 
     # Intrinsic parameters
     fu = intrinsic[:, 0, 0] * W  # (B,)
@@ -30,7 +33,7 @@ def get_normal_map(depth_map: torch.Tensor, intrinsic: torch.Tensor) -> torch.Te
     x_cam = (u - cu[:, None, None]) * depth_map / fu[:, None, None]
     y_cam = (v - cv[:, None, None]) * depth_map / fv[:, None, None]
     z_cam = depth_map
-    
+
     # Stack to form camera coordinates (B, H, W, 3)
     cam_coords = torch.stack((x_cam, y_cam, z_cam), dim=-1).to(dtype=torch.float32)
 

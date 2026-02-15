@@ -13,11 +13,13 @@ from typing import List, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 # import dust3r.utils.path_to_croco
 from .dpt_block import DPTOutputAdapter, Interpolate, make_fusion_block
 from .head_modules import UnetExtractor, AppearanceTransformer, _init_weights
 from .postprocess import postprocess
 import torchvision
+
 
 def custom_interpolate(
     x: torch.Tensor,
@@ -31,7 +33,7 @@ def custom_interpolate(
     """
     if size is None:
         size = (int(x.shape[-2] * scale_factor), int(x.shape[-1] * scale_factor))
-    
+
     INT_MAX = 1610612736
 
     input_elements = size[0] * size[1] * x.shape[0] * x.shape[1]
@@ -39,13 +41,15 @@ def custom_interpolate(
     if input_elements > INT_MAX:
         chunks = torch.chunk(x, chunks=(input_elements // INT_MAX) + 1, dim=0)
         interpolated_chunks = [
-            nn.functional.interpolate(chunk, size=size, mode=mode, align_corners=align_corners) for chunk in chunks
+            nn.functional.interpolate(chunk, size=size, mode=mode, align_corners=align_corners)
+            for chunk in chunks
         ]
         x = torch.cat(interpolated_chunks, dim=0)
         return x.contiguous()
     else:
         return nn.functional.interpolate(x, size=size, mode=mode, align_corners=align_corners)
-    
+
+
 # class DPTOutputAdapter_fix(DPTOutputAdapter):
 #     """
 #     Adapt croco's DPTOutputAdapter implementation for dust3r:
@@ -84,7 +88,7 @@ def custom_interpolate(
 #         # Number of patches in height and width
 #         N_H = H // (self.stride_level * self.P_H)
 #         N_W = W // (self.stride_level * self.P_W)
-#           
+#
 #         # Hook decoder onto 4 layers from specified ViT layers
 #         layers = [encoder_tokens[hook] for hook in self.hooks]
 #
@@ -136,7 +140,7 @@ class DPTOutputAdapter_fix(DPTOutputAdapter):
         del self.act_2_postprocess
         del self.act_3_postprocess
         del self.act_4_postprocess
-        
+
         self.feat_up = Interpolate(scale_factor=2, mode="bilinear", align_corners=True)
         # self.input_merger = nn.Sequential(
         #     # nn.Conv2d(256+3+3+1, 256, kernel_size=3, padding=1),
@@ -146,7 +150,7 @@ class DPTOutputAdapter_fix(DPTOutputAdapter):
         # )
 
     def forward(self, encoder_tokens: List[torch.Tensor], depths, imgs, image_size=None, conf=None):
-        assert self.dim_tokens_enc is not None, 'Need to call init(dim_tokens_enc) function first'
+        assert self.dim_tokens_enc is not None, "Need to call init(dim_tokens_enc) function first"
         # H, W = input_info['image_size']
         image_size = self.image_size if image_size is None else image_size
         H, W = image_size
@@ -161,14 +165,14 @@ class DPTOutputAdapter_fix(DPTOutputAdapter):
         layers = [self.adapt_tokens(l) for l in layers]
 
         # Reshape tokens to spatial representation
-        layers = [rearrange(l, 'b (nh nw) c -> b c nh nw', nh=N_H, nw=N_W) for l in layers]
+        layers = [rearrange(l, "b (nh nw) c -> b c nh nw", nh=N_H, nw=N_W) for l in layers]
 
         layers = [self.act_postprocess[idx](l) for idx, l in enumerate(layers)]
         # Project layers to chosen feature dim
         layers = [self.scratch.layer_rn[idx](l) for idx, l in enumerate(layers)]
-        
+
         # Fuse layers using refinement stages
-        path_4 = self.scratch.refinenet4(layers[3])[:, :, :layers[2].shape[2], :layers[2].shape[3]]
+        path_4 = self.scratch.refinenet4(layers[3])[:, :, : layers[2].shape[2], : layers[2].shape[3]]
         path_3 = self.scratch.refinenet3(path_4, layers[2])
         path_2 = self.scratch.refinenet2(path_3, layers[1])
         path_1 = self.scratch.refinenet1(path_2, layers[0])
@@ -176,10 +180,10 @@ class DPTOutputAdapter_fix(DPTOutputAdapter):
         # direct_img_feat = self.input_merger(imgs)
         # actually, we just do interpolate here
         # path_1 = self.feat_up(path_1)
-        path_1 = custom_interpolate(path_1, size=(H, W), mode='bilinear', align_corners=True)
+        path_1 = custom_interpolate(path_1, size=(H, W), mode="bilinear", align_corners=True)
         # path_1 = F.interpolate(path_1, size=(H, W), mode='bilinear', align_corners=True)
         # path_1 = path_1 + direct_img_feat
-        
+
         # path_1 = torch.cat([path_1, imgs], dim=1)
 
         # Output head
@@ -189,24 +193,33 @@ class DPTOutputAdapter_fix(DPTOutputAdapter):
 
 
 class PixelwiseTaskWithDPT(nn.Module):
-    """ DPT module for dust3r, can return 3D points + confidence for all pixels"""
+    """DPT module for dust3r, can return 3D points + confidence for all pixels"""
 
-    def __init__(self, *, n_cls_token=0, hooks_idx=None, dim_tokens=None,
-                 output_width_ratio=1, num_channels=1, postprocess=None, depth_mode=None, conf_mode=None, **kwargs):
+    def __init__(
+        self,
+        *,
+        n_cls_token=0,
+        hooks_idx=None,
+        dim_tokens=None,
+        output_width_ratio=1,
+        num_channels=1,
+        postprocess=None,
+        depth_mode=None,
+        conf_mode=None,
+        **kwargs,
+    ):
         super(PixelwiseTaskWithDPT, self).__init__()
         self.return_all_layers = True  # backbone needs to return all layers
         self.postprocess = postprocess
         self.depth_mode = depth_mode
         self.conf_mode = conf_mode
-        
+
         assert n_cls_token == 0, "Not implemented"
-        dpt_args = dict(output_width_ratio=output_width_ratio,
-                        num_channels=num_channels,
-                        **kwargs)
+        dpt_args = dict(output_width_ratio=output_width_ratio, num_channels=num_channels, **kwargs)
         if hooks_idx is not None:
             dpt_args.update(hooks=hooks_idx)
         self.dpt = DPTOutputAdapter_fix(**dpt_args)
-        dpt_init_args = {} if dim_tokens is None else {'dim_tokens_enc': dim_tokens}
+        dpt_init_args = {} if dim_tokens is None else {"dim_tokens_enc": dim_tokens}
         self.dpt.init(**dpt_init_args)
 
     def forward(self, x, depths, imgs, img_info, conf=None):
@@ -214,13 +227,26 @@ class PixelwiseTaskWithDPT(nn.Module):
         if self.postprocess:
             out = self.postprocess(out, self.depth_mode, self.conf_mode)
         return out, interm_feats
-    
+
+
 class AttnBasedAppearanceHead(nn.Module):
     """
     Attention head Appearence Reconstruction
     """
 
-    def __init__(self, num_channels, patch_size, feature_dim, last_dim, hooks_idx, dim_tokens, postprocess, depth_mode, conf_mode, head_type='gs_params'):
+    def __init__(
+        self,
+        num_channels,
+        patch_size,
+        feature_dim,
+        last_dim,
+        hooks_idx,
+        dim_tokens,
+        postprocess,
+        depth_mode,
+        conf_mode,
+        head_type="gs_params",
+    ):
         super().__init__()
 
         self.num_channels = num_channels
@@ -237,7 +263,7 @@ class AttnBasedAppearanceHead(nn.Module):
         # Freeze the VGG parameters
         for param in self.vgg_feature_extractor.parameters():
             param.requires_grad = False
-        
+
         self.token_decoder = nn.Sequential(
             nn.Linear(dim_tokens[0] * (len(self.hooks) + 1), self.C_feat * (self.patch_size[0] ** 2)),
             nn.SiLU(),
@@ -246,25 +272,30 @@ class AttnBasedAppearanceHead(nn.Module):
 
         self.pixel_linear = nn.Linear(self.C_feat, self.num_channels)
 
-
     def img_pts_tokenizer(self, imgs):
-        _, _, H, W = imgs.shape        
+        _, _, H, W = imgs.shape
         # Process images through VGG to extract features
         # imgs = imgs.permute(0, 2, 3, 1).contiguous()
         with torch.no_grad():
             vgg_features = self.vgg_feature_extractor(imgs)
-        
+
         # 1. concat original images with vgg features and then patchify
-        vgg_features = F.interpolate(vgg_features, size=(H, W), mode='bilinear', align_corners=False)
+        vgg_features = F.interpolate(vgg_features, size=(H, W), mode="bilinear", align_corners=False)
         combined = torch.cat([imgs, vgg_features], dim=1)  # [B, C+512, H, W]
         combined = combined.permute(0, 2, 3, 1).contiguous()
-        
+
         patch_size = self.patch_size
         hh = H // patch_size[0]
         ww = W // patch_size[1]
-        input_patches = rearrange(combined, "b (hh ph) (ww pw) c -> b (hh ww) (ph pw c)", 
-                                 hh=hh, ww=ww, ph=patch_size[0], pw=patch_size[1])
-        
+        input_patches = rearrange(
+            combined,
+            "b (hh ph) (ww pw) c -> b (hh ww) (ph pw c)",
+            hh=hh,
+            ww=ww,
+            ph=patch_size[0],
+            pw=patch_size[1],
+        )
+
         input_tokens = self.tokenizer(input_patches)
 
         # 2. only use vgg features, use a shallow conv to get the token
@@ -286,15 +317,25 @@ class AttnBasedAppearanceHead(nn.Module):
         B, V, H, W = img_info
         input_tokens = self.img_pts_tokenizer(imgs)
         # Hook decoder onto 4 layers from specified ViT layers
-        layer_tokens = [x[hook] for hook in self.hooks] # [B, S, D]
+        layer_tokens = [x[hook] for hook in self.hooks]  # [B, S, D]
         # layer_tokens.append(input_tokens)
 
         x = self.token_decoder(torch.cat(layer_tokens, dim=-1))
-        x = x.view(B*V, (H // self.patch_size[0]) * (W // self.patch_size[1]), self.patch_size[0]**2, self.C_feat).flatten(1, 2).contiguous()
+        x = (
+            x.view(
+                B * V,
+                (H // self.patch_size[0]) * (W // self.patch_size[1]),
+                self.patch_size[0] ** 2,
+                self.C_feat,
+            )
+            .flatten(1, 2)
+            .contiguous()
+        )
         out_flat = self.pixel_linear(x)
-        
-        return out_flat.view(B*V, H, W, -1).permute(0, 3, 1, 2)
-    
+
+        return out_flat.view(B * V, H, W, -1).permute(0, 3, 1, 2)
+
+
 # class Pixellevel_Linear_Pts3d(nn.Module):
 #     """
 #     Pixel-level linear head for DUST3R
@@ -355,7 +396,8 @@ class AttnBasedAppearanceHead(nn.Module):
 
 #         # 4. Postprocess depth/conf
 #         return out
-    
+
+
 def create_gs_linear_head(net, has_conf=False, out_nchan=3, postprocess_func=postprocess):
     """
     return PixelwiseTaskWithDPT for given net params
@@ -363,21 +405,23 @@ def create_gs_linear_head(net, has_conf=False, out_nchan=3, postprocess_func=pos
     assert net.dec_depth > 9
     l2 = net.dec_depth
     feature_dim = net.feature_dim
-    last_dim = feature_dim//2
+    last_dim = feature_dim // 2
     ed = net.enc_embed_dim
     dd = net.dec_embed_dim
-    try:    
+    try:
         patch_size = net.patch_size
     except:
         patch_size = (16, 16)
 
-    return AttnBasedAppearanceHead(num_channels=out_nchan + has_conf,
-                                patch_size=patch_size,
-                                feature_dim=feature_dim,
-                                last_dim=last_dim,
-                                hooks_idx=[0, l2*2//4, l2*3//4, l2],
-                                dim_tokens=[ed, dd, dd, dd],
-                                postprocess=postprocess_func,
-                                depth_mode=net.depth_mode,
-                                conf_mode=net.conf_mode,
-                                head_type='gs_params')
+    return AttnBasedAppearanceHead(
+        num_channels=out_nchan + has_conf,
+        patch_size=patch_size,
+        feature_dim=feature_dim,
+        last_dim=last_dim,
+        hooks_idx=[0, l2 * 2 // 4, l2 * 3 // 4, l2],
+        dim_tokens=[ed, dd, dd, dd],
+        postprocess=postprocess_func,
+        depth_mode=net.depth_mode,
+        conf_mode=net.conf_mode,
+        head_type="gs_params",
+    )

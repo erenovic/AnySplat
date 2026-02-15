@@ -98,6 +98,7 @@ def compute_pose_error(pose_gt, pose_pred):
     error_R = angle_error_mat(R, R_gt)
     return error_t, error_t_scale, error_R
 
+
 @torch.no_grad()
 def abs_relative_difference(output, target, valid_mask=None):
     actual_output = output
@@ -110,6 +111,7 @@ def abs_relative_difference(output, target, valid_mask=None):
         n = output.shape[-1] * output.shape[-2]
     abs_relative_diff = torch.sum(abs_relative_diff, (-1, -2)) / n
     return abs_relative_diff.mean()
+
 
 # adapt from: https://github.com/imran3180/depth-map-prediction/blob/master/main.py
 @torch.no_grad()
@@ -128,6 +130,7 @@ def threshold_percentage(output, target, threshold_val, valid_mask=None):
     count_mat = torch.sum(bit_mat, (-1, -2))
     threshold_mat = count_mat / n
     return threshold_mat.mean()
+
 
 @torch.no_grad()
 def delta1_acc(pred, gt, valid_mask):

@@ -23,6 +23,7 @@ class ViewSamplerBoundedCfg:
     min_gap_multiplier: int
     max_gap_multiplier: int
 
+
 class ViewSamplerBounded(ViewSampler[ViewSamplerBoundedCfg]):
     def schedule(self, initial: int, final: int) -> int:
         fraction = self.global_step / self.cfg.warm_up_steps
@@ -61,7 +62,7 @@ class ViewSamplerBounded(ViewSampler[ViewSamplerBoundedCfg]):
         #     min_gap = self.cfg.min_distance_between_context_views
 
         min_gap, max_gap = self.num_ctxt_gap_mapping[num_context_views]
-        max_gap = min(max_gap, num_views-1)
+        max_gap = min(max_gap, num_views - 1)
         # Pick the gap between the context views.
         if not self.cameras_are_circular:
             max_gap = min(num_views - 1, max_gap)
@@ -111,7 +112,7 @@ class ViewSamplerBounded(ViewSampler[ViewSamplerBoundedCfg]):
         if self.cameras_are_circular:
             index_target %= num_views
             index_context_right %= num_views
-        
+
         # If more than two context views are desired, pick extra context views between
         # the left and right ones.
         if num_context_views > 2:
@@ -128,11 +129,7 @@ class ViewSamplerBounded(ViewSampler[ViewSamplerBoundedCfg]):
 
         overlap = torch.tensor([0.5], dtype=torch.float32, device=device)  # dummy
 
-        return (
-            torch.tensor((index_context_left, *extra_views, index_context_right)),
-            index_target,
-            overlap
-        )
+        return (torch.tensor((index_context_left, *extra_views, index_context_right)), index_target, overlap)
 
     @property
     def num_context_views(self) -> int:
@@ -141,11 +138,16 @@ class ViewSamplerBounded(ViewSampler[ViewSamplerBoundedCfg]):
     @property
     def num_target_views(self) -> int:
         return self.cfg.num_target_views
-    
+
     @property
     def num_ctxt_gap_mapping(self) -> dict:
         mapping = dict()
         for num_ctxt in range(2, self.cfg.num_context_views + 1):
-            mapping[num_ctxt] = [min(num_ctxt * self.cfg.min_gap_multiplier, self.cfg.min_distance_between_context_views), 
-                                 min(max(num_ctxt * self.cfg.max_gap_multiplier, num_ctxt ** 2), self.cfg.max_distance_between_context_views)]
+            mapping[num_ctxt] = [
+                min(num_ctxt * self.cfg.min_gap_multiplier, self.cfg.min_distance_between_context_views),
+                min(
+                    max(num_ctxt * self.cfg.max_gap_multiplier, num_ctxt**2),
+                    self.cfg.max_distance_between_context_views,
+                ),
+            ]
         return mapping

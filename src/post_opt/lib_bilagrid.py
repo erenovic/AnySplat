@@ -83,9 +83,7 @@ def color_correct(
         - The function works with any number of channels, but typically used with 3 (RGB).
     """
     if img.shape[-1] != ref.shape[-1]:
-        raise ValueError(
-            f"img's {img.shape[-1]} and ref's {ref.shape[-1]} channels must match"
-        )
+        raise ValueError(f"img's {img.shape[-1]} and ref's {ref.shape[-1]} channels must match")
     num_channels = img.shape[-1]
     img_mat = img.reshape([-1, num_channels])
     ref_mat = ref.reshape([-1, num_channels])
@@ -131,9 +129,7 @@ def bilateral_grid_tv_loss(model, config):
     total_loss = 0.0
 
     for bil_grids in model.bil_grids:
-        total_loss += config.bilgrid_tv_loss_mult * total_variation_loss(
-            bil_grids.grids
-        )
+        total_loss += config.bilgrid_tv_loss_mult * total_variation_loss(bil_grids.grids)
 
     return total_loss
 
@@ -148,10 +144,7 @@ def color_affine_transform(affine_mats, rgb):
     Returns:
         Output transformed colors of shape $(..., 3)$.
     """
-    return (
-        torch.matmul(affine_mats[..., :3], rgb.unsqueeze(-1)).squeeze(-1)
-        + affine_mats[..., 3]
-    )
+    return torch.matmul(affine_mats[..., :3], rgb.unsqueeze(-1)).squeeze(-1) + affine_mats[..., 3]
 
 
 def _num_tensor_elems(t):
@@ -229,18 +222,14 @@ def slice(bil_grids, xy, rgb, grid_idx):
         elif len(grid_idx.shape) == 2:
             grid_idx = grid_idx[:, 0]  # (chunk_size,)
         else:
-            raise ValueError(
-                "The input to bilateral grid slicing is not supported yet."
-            )
+            raise ValueError("The input to bilateral grid slicing is not supported yet.")
 
     affine_mats = bil_grids(xy, rgb, grid_idx)
     rgb = color_affine_transform(affine_mats, rgb)
 
     return {
         "rgb": rgb.reshape(*sh_),
-        "rgb_affine_mats": affine_mats.reshape(
-            *sh_[:-1], affine_mats.shape[-2], affine_mats.shape[-1]
-        ),
+        "rgb_affine_mats": affine_mats.reshape(*sh_[:-1], affine_mats.shape[-2], affine_mats.shape[-1]),
     }
 
 
@@ -294,12 +283,8 @@ class BilateralGrid(nn.Module):
                 0,
             ]
         ).float()
-        grid = grid.repeat(
-            [self.grid_guidance * self.grid_height * self.grid_width, 1]
-        )  # (L * H * W, 12)
-        grid = grid.reshape(
-            1, self.grid_guidance, self.grid_height, self.grid_width, -1
-        )  # (1, L, H, W, 12)
+        grid = grid.repeat([self.grid_guidance * self.grid_height * self.grid_width, 1])  # (L * H * W, 12)
+        grid = grid.reshape(1, self.grid_guidance, self.grid_height, self.grid_width, -1)  # (1, L, H, W, 12)
         grid = grid.permute(0, 4, 1, 2, 3)  # (1, 12, L, H, W)
         return grid
 
@@ -334,9 +319,7 @@ class BilateralGrid(nn.Module):
                 rgb = rgb.unsqueeze(1)
             assert idx is not None
         elif input_ndims != 5:
-            raise ValueError(
-                "Bilateral grid slicing only takes either 2D, 3D, 4D and 5D inputs"
-            )
+            raise ValueError("Bilateral grid slicing only takes either 2D, 3D, 4D and 5D inputs")
 
         grids = self.grids
         if idx is not None:
@@ -355,9 +338,7 @@ class BilateralGrid(nn.Module):
             grids, grid_xyz, mode="bilinear", align_corners=True, padding_mode="border"
         )  # (N, 12, m, h, w)
         affine_mats = affine_mats.permute(0, 2, 3, 4, 1)  # (N, m, h, w, 12)
-        affine_mats = affine_mats.reshape(
-            *affine_mats.shape[:-1], 3, 4
-        )  # (N, m, h, w, 3, 4)
+        affine_mats = affine_mats.reshape(*affine_mats.shape[:-1], 3, 4)  # (N, m, h, w, 3, 4)
 
         for _ in range(5 - input_ndims):
             affine_mats = affine_mats.squeeze(1)
@@ -480,9 +461,7 @@ class BilateralGridCP4D(nn.Module):
             )
         else:
             # Weights of BT601/BT470 RGB-to-gray.
-            self.register_buffer(
-                "rgb2gray_weight", torch.Tensor([[0.299, 0.587, 0.114]])
-            )
+            self.register_buffer("rgb2gray_weight", torch.Tensor([[0.299, 0.587, 0.114]]))
             self.rgb2gray = lambda rgb: (rgb @ self.rgb2gray_weight.T) * 2.0 - 1.0
 
     def _init_identity_grid(self):

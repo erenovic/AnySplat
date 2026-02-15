@@ -16,10 +16,11 @@ from typing import Callable, Iterable, Optional
 from torch.utils.data import DataLoader, Dataset, DistributedSampler, IterableDataset, Sampler, BatchSampler
 import random
 
+
 def custom_collate_fn(batch):
     """
     Custom collate function to handle variable batch sizes
-    
+
     Args:
         batch: A list where each element could be either:
             - A single tuple (idx, num_images, ...)
@@ -33,9 +34,10 @@ def custom_collate_fn(batch):
         for item in batch:
             flattened.extend(item)
         batch = flattened
-    
+
     # Now batch is a list of tuples, process normally
     return torch.utils.data.default_collate(batch)
+
 
 class BatchedRandomSampler:
     """Random sampling under a constraint: each sample in the batch has the same feature,
@@ -48,7 +50,15 @@ class BatchedRandomSampler:
     """
 
     def __init__(
-        self, dataset, batch_size, num_context_views, min_patch_num=20, max_patch_num=32, world_size=1, rank=0, drop_last=True
+        self,
+        dataset,
+        batch_size,
+        num_context_views,
+        min_patch_num=20,
+        max_patch_num=32,
+        world_size=1,
+        rank=0,
+        drop_last=True,
     ):
         self.batch_size = batch_size
         self.num_context_views = num_context_views
@@ -57,9 +67,7 @@ class BatchedRandomSampler:
         self.total_size = round_by(N, batch_size * world_size) if drop_last else N
         self.min_patch_num = min_patch_num
         self.max_patch_num = max_patch_num
-        assert (
-            world_size == 1 or drop_last
-        ), "must drop the last batch in distributed mode"
+        assert world_size == 1 or drop_last, "must drop the last batch in distributed mode"
 
         # distributed sampler
         self.world_size = world_size
@@ -67,7 +75,6 @@ class BatchedRandomSampler:
         self.epoch = None
 
     def __len__(self):
-
 
         return self.total_size // self.world_size
 
@@ -77,18 +84,16 @@ class BatchedRandomSampler:
     def __iter__(self):
         # prepare RNG
         if self.epoch is None:
-            assert (
-                self.world_size == 1 and self.rank == 0
-            ), "use set_epoch() if distributed mode is used"
+            assert self.world_size == 1 and self.rank == 0, "use set_epoch() if distributed mode is used"
             seed = int(torch.empty((), dtype=torch.int64).random_().item())
         else:
             seed = self.epoch + 777
         rng = np.random.default_rng(seed=seed)
-        
+
         # random indices (will restart from 0 if not drop_last)
         sample_idxs = np.arange(self.total_size)
         rng.shuffle(sample_idxs)
-        
+
         # random feat_idxs (same across each batch)
         n_batches = (self.total_size + self.batch_size - 1) // self.batch_size
         num_imgs = rng.integers(low=2, high=self.num_context_views, size=n_batches)
@@ -102,25 +107,20 @@ class BatchedRandomSampler:
         # Distributed sampler: we select a subset of batches
         # make sure the slice for each node is aligned with batch_size
         size_per_proc = self.batch_size * (
-            (self.total_size + self.world_size * self.batch_size - 1)
-            // (self.world_size * self.batch_size)
+            (self.total_size + self.world_size * self.batch_size - 1) // (self.world_size * self.batch_size)
         )
         idxs = idxs[self.rank * size_per_proc : (self.rank + 1) * size_per_proc]
 
         yield from (tuple(idx) for idx in idxs)
+
 
 class DynamicBatchSampler(Sampler):
     """
     A custom batch sampler that dynamically adjusts batch size, aspect ratio, and image number
     for each sample. Batches within a sample share the same aspect ratio and image number.
     """
-    def __init__(self,
-                 sampler,
-                 image_num_range,
-                 h_range,
-                 epoch=0,
-                 seed=42,
-                 max_img_per_gpu=48):
+
+    def __init__(self, sampler, image_num_range, h_range, epoch=0, seed=42, max_img_per_gpu=48):
         """
         Initializes the dynamic batch sampler.
 
@@ -136,15 +136,23 @@ class DynamicBatchSampler(Sampler):
         self.image_num_range = image_num_range
         self.h_range = h_range
         self.rng = random.Random()
-        
+
         # Uniformly sample from the range of possible image numbers
         # For any image number, the weight is 1.0 (uniform sampling). You can set any different weights here.
-        self.image_num_weights = {num_images: float(num_images**2) for num_images in range(image_num_range[0], image_num_range[1]+1)}
+        self.image_num_weights = {
+            num_images: float(num_images**2)
+            for num_images in range(image_num_range[0], image_num_range[1] + 1)
+        }
 
         # Possible image numbers, e.g., [2, 3, 4, ..., 24]
-        self.possible_nums = np.array([n for n in self.image_num_weights.keys()
-                                       if self.image_num_range[0] <= n <= self.image_num_range[1]])
-        
+        self.possible_nums = np.array(
+            [
+                n
+                for n in self.image_num_weights.keys()
+                if self.image_num_range[0] <= n <= self.image_num_range[1]
+            ]
+        )
+
         # Normalize weights for sampling
         weights = [self.image_num_weights[n] for n in self.possible_nums]
         self.normalized_weights = np.array(weights) / sum(weights)
@@ -179,14 +187,11 @@ class DynamicBatchSampler(Sampler):
             try:
                 # Sample random image number and aspect ratio
                 random_image_num = int(np.random.choice(self.possible_nums, p=self.normalized_weights))
-                random_ps_h = np.random.randint(low=(self.h_range[0] // 14), high=(self.h_range[1] // 14)+1)
+                random_ps_h = np.random.randint(low=(self.h_range[0] // 14), high=(self.h_range[1] // 14) + 1)
 
                 # Update sampler parameters
-                self.sampler.update_parameters(
-                    image_num=random_image_num,
-                    ps_h=random_ps_h
-                )
-                
+                self.sampler.update_parameters(image_num=random_image_num, ps_h=random_ps_h)
+
                 # Calculate batch size based on max images per GPU and current image number
                 batch_size = self.max_img_per_gpu / random_image_num
                 batch_size = np.floor(batch_size).astype(int)
@@ -219,6 +224,7 @@ class DynamicDistributedSampler(DistributedSampler):
     Extends PyTorch's DistributedSampler to include dynamic aspect_ratio and image_num
     parameters, which can be passed into the dataset's __getitem__ method.
     """
+
     def __init__(
         self,
         dataset,
@@ -229,12 +235,7 @@ class DynamicDistributedSampler(DistributedSampler):
         drop_last: bool = False,
     ):
         super().__init__(
-            dataset,
-            num_replicas=num_replicas,
-            rank=rank,
-            shuffle=shuffle,
-            seed=seed,
-            drop_last=drop_last
+            dataset, num_replicas=num_replicas, rank=rank, shuffle=shuffle, seed=seed, drop_last=drop_last
         )
         self.image_num = None
         self.ps_h = None
@@ -248,7 +249,11 @@ class DynamicDistributedSampler(DistributedSampler):
         indices_iter = super().__iter__()
 
         for idx in indices_iter:
-            yield (idx, self.image_num, self.ps_h, )
+            yield (
+                idx,
+                self.image_num,
+                self.ps_h,
+            )
 
     def update_parameters(self, image_num, ps_h):
         """
@@ -261,13 +266,22 @@ class DynamicDistributedSampler(DistributedSampler):
         self.image_num = image_num
         self.ps_h = ps_h
 
+
 class MixedBatchSampler(BatchSampler):
     """Sample one batch from a selected dataset with given probability.
     Compatible with datasets at different resolution
     """
 
     def __init__(
-        self, src_dataset_ls, batch_size, num_context_views, world_size=1, rank=0, prob=None, sampler=None, generator=None
+        self,
+        src_dataset_ls,
+        batch_size,
+        num_context_views,
+        world_size=1,
+        rank=0,
+        prob=None,
+        sampler=None,
+        generator=None,
     ):
         self.base_sampler = None
         self.batch_size = batch_size
@@ -279,17 +293,19 @@ class MixedBatchSampler(BatchSampler):
 
         self.src_dataset_ls = src_dataset_ls
         self.n_dataset = len(self.src_dataset_ls)
-        
+
         # Dataset length
         self.dataset_length = [len(ds) for ds in self.src_dataset_ls]
         self.cum_dataset_length = [
             sum(self.dataset_length[:i]) for i in range(self.n_dataset)
         ]  # cumulative dataset length
-        
+
         # BatchSamplers for each source dataset
         self.src_batch_samplers = []
         for ds in self.src_dataset_ls:
-            sampler = DynamicDistributedSampler(ds, num_replicas=self.world_size, rank=self.rank, seed=42, shuffle=True)
+            sampler = DynamicDistributedSampler(
+                ds, num_replicas=self.world_size, rank=self.rank, seed=42, shuffle=True
+            )
             sampler.set_epoch(0)
 
             if hasattr(ds, "epoch"):
@@ -297,14 +313,14 @@ class MixedBatchSampler(BatchSampler):
             if hasattr(ds, "set_epoch"):
                 ds.set_epoch(0)
             batch_sampler = DynamicBatchSampler(
-                sampler, 
-                [2, ds.cfg.view_sampler.num_context_views], 
+                sampler,
+                [2, ds.cfg.view_sampler.num_context_views],
                 ds.cfg.input_image_shape,
                 seed=42,
-                max_img_per_gpu=ds.cfg.view_sampler.max_img_per_gpu
+                max_img_per_gpu=ds.cfg.view_sampler.max_img_per_gpu,
             )
             self.src_batch_samplers.append(batch_sampler)
-        
+
         # self.src_batch_samplers = [
         #     BatchedRandomSampler(
         #         ds,
@@ -320,9 +336,7 @@ class MixedBatchSampler(BatchSampler):
         print("Setting epoch for all underlying BatchedRandomSamplers")
         # for sampler in self.src_batch_samplers:
         #     sampler.set_epoch(0)
-        self.raw_batches = [
-            list(bs) for bs in self.src_batch_samplers
-        ]  # index in original dataset
+        self.raw_batches = [list(bs) for bs in self.src_batch_samplers]  # index in original dataset
         self.n_batches = [len(b) for b in self.raw_batches]
         self.n_total_batch = sum(self.n_batches)
         # print("Total batch num is ", self.n_total_batch)
@@ -332,19 +346,17 @@ class MixedBatchSampler(BatchSampler):
             self.prob = torch.tensor(self.n_batches) / self.n_total_batch
         else:
             self.prob = torch.as_tensor(prob)
-    
+
     def __iter__(self):
         """Yields batches of indices in the format of (sample_idx, feat_idx) tuples,
         where indices correspond to ConcatDataset of src_dataset_ls
         """
         for _ in range(self.n_total_batch):
-            idx_ds = torch.multinomial(
-                self.prob, 1, replacement=True, generator=self.generator
-            ).item()
-            
+            idx_ds = torch.multinomial(self.prob, 1, replacement=True, generator=self.generator).item()
+
             if 0 == len(self.raw_batches[idx_ds]):
                 self.raw_batches[idx_ds] = list(self.src_batch_samplers[idx_ds])
-            
+
             # get a batch from list - this is already in (sample_idx, feat_idx) format
             batch_raw = self.raw_batches[idx_ds].pop()
 
@@ -357,7 +369,7 @@ class MixedBatchSampler(BatchSampler):
                 processed_item = (item[0] + shift, item[1], item[2])
                 processed_batch.append(processed_item)
             yield processed_batch
-        
+
     def set_epoch(self, epoch):
         """Set epoch for all underlying BatchedRandomSamplers"""
         for sampler in self.src_batch_samplers:
@@ -367,6 +379,7 @@ class MixedBatchSampler(BatchSampler):
 
     def __len__(self):
         return self.n_total_batch
+
 
 def round_by(total, multiple, up=False):
     if up:

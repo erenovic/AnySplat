@@ -19,9 +19,7 @@ def setup_args():
     parser = argparse.ArgumentParser(description="Test AnySplat on NVS evaluation")
     parser.add_argument("--data_dir", type=str, required=True, help="Path to NVS dataset")
     parser.add_argument("--llffhold", type=int, default=8, help="LLFF holdout")
-    parser.add_argument(
-        "--output_path", type=str, default="outputs/nvs", help="Path to output directory"
-    )
+    parser.add_argument("--output_path", type=str, default="outputs/nvs", help="Path to output directory")
     return parser.parse_args()
 
 
@@ -101,8 +99,7 @@ def evaluate(args: argparse.Namespace):
     )
 
     scale_factor = (
-        pred_context_pose["extrinsic"][:, :, :3, 3].mean()
-        / pred_all_context_extrinsic[:, :, :3, 3].mean()
+        pred_context_pose["extrinsic"][:, :, :3, 3].mean() / pred_all_context_extrinsic[:, :, :3, 3].mean()
     )
     pred_all_target_extrinsic[..., :3, 3] = pred_all_target_extrinsic[..., :3, 3] * scale_factor
     pred_all_context_extrinsic[..., :3, 3] = pred_all_context_extrinsic[..., :3, 3] * scale_factor

@@ -7,11 +7,11 @@ from src.model.encoder.vggt.utils.geometry import closed_form_inverse_se3, unpro
 def convert_pt3d_RT_to_opencv(Rot, Trans):
     """
     Convert Point3D extrinsic matrices to OpenCV convention.
-    
+
     Args:
         Rot: 3D rotation matrix in Point3D format
         Trans: 3D translation vector in Point3D format
-        
+
     Returns:
         extri_opencv: 3x4 extrinsic matrix in OpenCV format
     """
@@ -28,11 +28,11 @@ def convert_pt3d_RT_to_opencv(Rot, Trans):
 def build_pair_index(N, B=1):
     """
     Build indices for all possible pairs of frames.
-    
+
     Args:
         N: Number of frames
         B: Batch size
-        
+
     Returns:
         i1, i2: Indices for all possible pairs
     """
@@ -44,13 +44,13 @@ def build_pair_index(N, B=1):
 def rotation_angle(rot_gt, rot_pred, batch_size=None, eps=1e-15):
     """
     Calculate rotation angle error between ground truth and predicted rotations.
-    
+
     Args:
         rot_gt: Ground truth rotation matrices
         rot_pred: Predicted rotation matrices
         batch_size: Batch size for reshaping the result
         eps: Small value to avoid numerical issues
-        
+
     Returns:
         Rotation angle error in degrees
     """
@@ -71,13 +71,13 @@ def rotation_angle(rot_gt, rot_pred, batch_size=None, eps=1e-15):
 def translation_angle(tvec_gt, tvec_pred, batch_size=None, ambiguity=True):
     """
     Calculate translation angle error between ground truth and predicted translations.
-    
+
     Args:
         tvec_gt: Ground truth translation vectors
         tvec_pred: Predicted translation vectors
         batch_size: Batch size for reshaping the result
         ambiguity: Whether to handle direction ambiguity
-        
+
     Returns:
         Translation angle error in degrees
     """
@@ -96,13 +96,13 @@ def translation_angle(tvec_gt, tvec_pred, batch_size=None, ambiguity=True):
 def compare_translation_by_angle(t_gt, t, eps=1e-15, default_err=1e6):
     """
     Normalize the translation vectors and compute the angle between them.
-    
+
     Args:
         t_gt: Ground truth translation vectors
         t: Predicted translation vectors
         eps: Small value to avoid division by zero
         default_err: Default error value for invalid cases
-        
+
     Returns:
         Angular error between translation vectors in radians
     """
@@ -128,15 +128,13 @@ def calculate_auc(r_error, t_error, max_threshold=30, return_list=False):
         t_error: torch.Tensor representing T error values (Degree)
         max_threshold: Maximum threshold value for binning the histogram
         return_list: Whether to return the normalized histogram as well
-        
+
     Returns:
         AUC value, and optionally the normalized histogram
     """
     error_matrix = torch.stack((r_error, t_error), dim=1)
     max_errors, _ = torch.max(error_matrix, dim=1)
-    histogram = torch.histc(
-        max_errors, bins=max_threshold + 1, min=0, max=max_threshold
-    )
+    histogram = torch.histc(max_errors, bins=max_threshold + 1, min=0, max=max_threshold)
     num_pairs = float(max_errors.size(0))
     normalized_histogram = histogram / num_pairs
 
@@ -156,7 +154,7 @@ def calculate_auc_np(r_error, t_error, max_threshold=30):
         r_error: numpy array representing R error values (Degree)
         t_error: numpy array representing T error values (Degree)
         max_threshold: Maximum threshold value for binning the histogram
-        
+
     Returns:
         AUC value and the normalized histogram
     """
@@ -172,12 +170,12 @@ def calculate_auc_np(r_error, t_error, max_threshold=30):
 def se3_to_relative_pose_error(pred_se3, gt_se3, num_frames):
     """
     Compute rotation and translation errors between predicted and ground truth poses.
-    
+
     Args:
         pred_se3: Predicted SE(3) transformations
         gt_se3: Ground truth SE(3) transformations
         num_frames: Number of frames
-        
+
     Returns:
         Rotation and translation angle errors in degrees
     """
@@ -185,20 +183,12 @@ def se3_to_relative_pose_error(pred_se3, gt_se3, num_frames):
 
     # Compute relative camera poses between pairs
     # We use closed_form_inverse to avoid potential numerical loss by torch.inverse()
-    relative_pose_gt = closed_form_inverse_se3(gt_se3[pair_idx_i1]).bmm(
-        gt_se3[pair_idx_i2]
-    )
-    relative_pose_pred = closed_form_inverse_se3(pred_se3[pair_idx_i1]).bmm(
-        pred_se3[pair_idx_i2]
-    )
-    
+    relative_pose_gt = closed_form_inverse_se3(gt_se3[pair_idx_i1]).bmm(gt_se3[pair_idx_i2])
+    relative_pose_pred = closed_form_inverse_se3(pred_se3[pair_idx_i1]).bmm(pred_se3[pair_idx_i2])
+
     # Compute the difference in rotation and translation
-    rel_rangle_deg = rotation_angle(
-        relative_pose_gt[:, :3, :3], relative_pose_pred[:, :3, :3]
-    )
-    rel_tangle_deg = translation_angle(
-        relative_pose_gt[:, :3, 3], relative_pose_pred[:, :3, 3]
-    )
+    rel_rangle_deg = rotation_angle(relative_pose_gt[:, :3, :3], relative_pose_pred[:, :3, :3])
+    rel_tangle_deg = translation_angle(relative_pose_gt[:, :3, 3], relative_pose_pred[:, :3, 3])
 
     return rel_rangle_deg, rel_tangle_deg
 
@@ -206,10 +196,10 @@ def se3_to_relative_pose_error(pred_se3, gt_se3, num_frames):
 def align_to_first_camera(camera_poses):
     """
     Align all camera poses to the first camera's coordinate frame.
-    
+
     Args:
         camera_poses: Tensor of shape (N, 4, 4) containing camera poses as SE3 transformations
-        
+
     Returns:
         Tensor of shape (N, 4, 4) containing aligned camera poses
     """

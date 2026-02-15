@@ -76,17 +76,13 @@ class DatasetDL3DV(Dataset):
         with open(f"{self.data_root}/{self.data_stage}_index.json") as file:
             data_index = json.load(file)
 
-        self.data_list = [
-            os.path.join(self.data_root, item) for item in data_index
-        ]  # train: 9900 test: 140
+        self.data_list = [os.path.join(self.data_root, item) for item in data_index]  # train: 9900 test: 140
 
         self.scene_ids = {}
         self.scenes = {}
         index = 0
         with ThreadPoolExecutor(max_workers=32) as executor:
-            futures = [
-                executor.submit(self.load_jsons, scene_path) for scene_path in self.data_list
-            ]
+            futures = [executor.submit(self.load_jsons, scene_path) for scene_path in self.data_list]
             for future in as_completed(futures):
                 scene_frames, scene_id = future.result()
                 self.scenes[scene_id] = scene_frames
@@ -282,9 +278,7 @@ class DatasetDL3DV(Dataset):
         else:
             intr_aug = False
 
-        example = apply_crop_shim(
-            example, (patchsize[0] * 14, patchsize[1] * 14), intr_aug=intr_aug
-        )
+        example = apply_crop_shim(example, (patchsize[0] * 14, patchsize[1] * 14), intr_aug=intr_aug)
 
         image_size = example["context"]["image"].shape[2:]
         context_intrinsics = example["context"]["intrinsics"].clone().detach().numpy()
@@ -306,9 +300,7 @@ class DatasetDL3DV(Dataset):
         # context_pts3d = torch.stack(context_pts3d_list, dim=0)
         # context_valid_mask = torch.stack(context_valid_mask_list, dim=0)
 
-        context_pts3d = torch.ones_like(example["context"]["image"]).permute(
-            0, 2, 3, 1
-        )  # [N, H, W, 3]
+        context_pts3d = torch.ones_like(example["context"]["image"]).permute(0, 2, 3, 1)  # [N, H, W, 3]
         context_valid_mask = torch.ones_like(example["context"]["image"])[:, 0].bool()  # [N, H, W]
 
         target_pts3d = torch.ones_like(target_images).permute(0, 2, 3, 1)  # [N, H, W, 3]

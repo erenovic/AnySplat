@@ -83,14 +83,26 @@ class DPTHead(nn.Module):
         self.resize_layers = nn.ModuleList(
             [
                 nn.ConvTranspose2d(
-                    in_channels=out_channels[0], out_channels=out_channels[0], kernel_size=4, stride=4, padding=0
+                    in_channels=out_channels[0],
+                    out_channels=out_channels[0],
+                    kernel_size=4,
+                    stride=4,
+                    padding=0,
                 ),
                 nn.ConvTranspose2d(
-                    in_channels=out_channels[1], out_channels=out_channels[1], kernel_size=2, stride=2, padding=0
+                    in_channels=out_channels[1],
+                    out_channels=out_channels[1],
+                    kernel_size=2,
+                    stride=2,
+                    padding=0,
                 ),
                 nn.Identity(),
                 nn.Conv2d(
-                    in_channels=out_channels[3], out_channels=out_channels[3], kernel_size=3, stride=2, padding=1
+                    in_channels=out_channels[3],
+                    out_channels=out_channels[3],
+                    kernel_size=3,
+                    stride=2,
+                    padding=1,
                 ),
             ]
         )
@@ -110,9 +122,11 @@ class DPTHead(nn.Module):
 
         head_features_1 = features
         head_features_2 = 32
-        
+
         if feature_only:
-            self.scratch.output_conv1 = nn.Conv2d(head_features_1, head_features_1, kernel_size=3, stride=1, padding=1)
+            self.scratch.output_conv1 = nn.Conv2d(
+                head_features_1, head_features_1, kernel_size=3, stride=1, padding=1
+            )
         else:
             self.scratch.output_conv1 = nn.Conv2d(
                 head_features_1, head_features_1 // 2, kernel_size=3, stride=1, padding=1
@@ -159,7 +173,7 @@ class DPTHead(nn.Module):
         # Process frames in batches
         all_preds = []
         all_conf = []
-        
+
         for frames_start_idx in range(0, S, frames_chunk_size):
             frames_end_idx = min(frames_start_idx + frames_chunk_size, S)
 
@@ -175,7 +189,7 @@ class DPTHead(nn.Module):
                 )
                 all_preds.append(chunk_preds)
                 all_conf.append(chunk_conf)
-        
+
         # Concatenate results along the sequence dimension
         if self.feature_only:
             return torch.cat(all_preds, dim=1)
@@ -214,7 +228,7 @@ class DPTHead(nn.Module):
 
         out = []
         dpt_idx = 0
-        
+
         for layer_idx in self.intermediate_layer_idx:
             # x = aggregated_tokens_list[layer_idx][:, :, patch_start_idx:]
             if len(aggregated_tokens_list) > 10:
@@ -229,7 +243,7 @@ class DPTHead(nn.Module):
 
             x = x.view(B * S, -1, x.shape[-1])
             x = self.norm(x)
-            
+
             x = x.permute(0, 2, 1).reshape((x.shape[0], x.shape[-1], patch_h, patch_w))
 
             x = self.projects[dpt_idx](x)
@@ -237,7 +251,7 @@ class DPTHead(nn.Module):
                 x = self._apply_pos_embed(x, W, H)
 
             x = self.resize_layers[dpt_idx](x)
-            
+
             out.append(x)
             dpt_idx += 1
 
@@ -246,7 +260,10 @@ class DPTHead(nn.Module):
         # Interpolate fused output to match target image resolution.
         out = custom_interpolate(
             out,
-            (int(patch_h * self.patch_size / self.down_ratio), int(patch_w * self.patch_size / self.down_ratio)),
+            (
+                int(patch_h * self.patch_size / self.down_ratio),
+                int(patch_w * self.patch_size / self.down_ratio),
+            ),
             mode="bilinear",
             align_corners=True,
         )
@@ -314,7 +331,9 @@ class DPTHead(nn.Module):
 ################################################################################
 
 
-def _make_fusion_block(features: int, size: int = None, has_residual: bool = True, groups: int = 1) -> nn.Module:
+def _make_fusion_block(
+    features: int, size: int = None, has_residual: bool = True, groups: int = 1
+) -> nn.Module:
     return FeatureFusionBlock(
         features,
         nn.ReLU(inplace=True),
@@ -372,8 +391,12 @@ class ResidualConvUnit(nn.Module):
 
         self.bn = bn
         self.groups = groups
-        self.conv1 = nn.Conv2d(features, features, kernel_size=3, stride=1, padding=1, bias=True, groups=self.groups)
-        self.conv2 = nn.Conv2d(features, features, kernel_size=3, stride=1, padding=1, bias=True, groups=self.groups)
+        self.conv1 = nn.Conv2d(
+            features, features, kernel_size=3, stride=1, padding=1, bias=True, groups=self.groups
+        )
+        self.conv2 = nn.Conv2d(
+            features, features, kernel_size=3, stride=1, padding=1, bias=True, groups=self.groups
+        )
 
         self.norm1 = None
         self.norm2 = None
@@ -486,7 +509,7 @@ def custom_interpolate(
     """
     if size is None:
         size = (int(x.shape[-2] * scale_factor), int(x.shape[-1] * scale_factor))
-    
+
     INT_MAX = 1610612736
 
     input_elements = size[0] * size[1] * x.shape[0] * x.shape[1]
@@ -494,7 +517,8 @@ def custom_interpolate(
     if input_elements > INT_MAX:
         chunks = torch.chunk(x, chunks=(input_elements // INT_MAX) + 1, dim=0)
         interpolated_chunks = [
-            nn.functional.interpolate(chunk, size=size, mode=mode, align_corners=align_corners) for chunk in chunks
+            nn.functional.interpolate(chunk, size=size, mode=mode, align_corners=align_corners)
+            for chunk in chunks
         ]
         x = torch.cat(interpolated_chunks, dim=0)
         return x.contiguous()

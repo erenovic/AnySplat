@@ -11,11 +11,11 @@ _logger = logging.getLogger(__name__)
 
 
 def resample_patch_embed(
-        patch_embed,
-        new_size: List[int],
-        interpolation: str = 'bicubic',
-        antialias: bool = True,
-        verbose: bool = False,
+    patch_embed,
+    new_size: List[int],
+    interpolation: str = "bicubic",
+    antialias: bool = True,
+    verbose: bool = False,
 ):
     """Resample the weights of the patch embedding kernel to target resolution.
     We resample the patch embedding kernel by approximately inverting the effect
@@ -37,11 +37,13 @@ def resample_patch_embed(
         Resized patch embedding kernel.
     """
     import numpy as np
+
     try:
         import functorch
+
         vmap = functorch.vmap
     except ImportError:
-        if hasattr(torch, 'vmap'):
+        if hasattr(torch, "vmap"):
             vmap = torch.vmap
         else:
             assert False, "functorch or a version of torch with vmap is required for FlexiViT resizing."
@@ -53,19 +55,22 @@ def resample_patch_embed(
         return patch_embed
 
     if verbose:
-        _logger.info(f"Resize patch embedding {patch_embed.shape} to {new_size}, w/ {interpolation} interpolation.")
+        _logger.info(
+            f"Resize patch embedding {patch_embed.shape} to {new_size}, w/ {interpolation} interpolation."
+        )
 
     def resize(x_np, _new_size):
         x_tf = torch.Tensor(x_np)[None, None, ...]
-        x_upsampled = F.interpolate(
-            x_tf, size=_new_size, mode=interpolation, antialias=antialias)[0, 0, ...].numpy()
+        x_upsampled = F.interpolate(x_tf, size=_new_size, mode=interpolation, antialias=antialias)[
+            0, 0, ...
+        ].numpy()
         return x_upsampled
 
     def get_resize_mat(_old_size, _new_size):
         mat = []
         for i in range(np.prod(_old_size)):
             basis_vec = np.zeros(_old_size)
-            basis_vec[np.unravel_index(i, _old_size)] = 1.
+            basis_vec[np.unravel_index(i, _old_size)] = 1.0
             mat.append(resize(basis_vec, _new_size).reshape(-1))
         return np.stack(mat).T
 
@@ -98,13 +103,13 @@ def adapt_input_conv(in_chans, conv_weight):
             conv_weight = conv_weight.sum(dim=1, keepdim=True)
     elif in_chans != 3:
         if I != 3:
-            raise NotImplementedError('Weight format not supported by conversion.')
+            raise NotImplementedError("Weight format not supported by conversion.")
         else:
             # NOTE this strategy should be better than random init, but there could be other combinations of
             # the original RGB input layer weights that'd work better for specific cases.
             repeat = int(math.ceil(in_chans / 3))
             conv_weight = conv_weight.repeat(1, repeat, 1, 1)[:, :in_chans, :, :]
-            conv_weight *= (3 / float(in_chans))
+            conv_weight *= 3 / float(in_chans)
 
             # instead of assigning the same weight to all channels, we can assign higher weight for original RGB channels
             # conv_weight[:, :3, :, :] = conv_weight[:, :3, :, :] * 0.5
@@ -142,23 +147,23 @@ def adapt_linear(conv_weight):
 
 
 def checkpoint_filter_fn(
-        state_dict: Dict[str, torch.Tensor],
-        model: nn.Module,
-        interpolation: str = 'bicubic',
-        antialias: bool = True,
+    state_dict: Dict[str, torch.Tensor],
+    model: nn.Module,
+    interpolation: str = "bicubic",
+    antialias: bool = True,
 ) -> Dict[str, torch.Tensor]:
-    """ convert patch embedding weight from manual patchify + linear proj to conv"""
+    """convert patch embedding weight from manual patchify + linear proj to conv"""
     out_dict = {}
     # state_dict = state_dict.get('model', state_dict)
     # state_dict = state_dict.get('state_dict', state_dict)
-    prefix = ''
+    prefix = ""
 
     if prefix:
         # filter on & remove prefix string from keys
-        state_dict = {k[len(prefix):]: v for k, v in state_dict.items() if k.startswith(prefix)}
+        state_dict = {k[len(prefix) :]: v for k, v in state_dict.items() if k.startswith(prefix)}
 
     for k, v in state_dict.items():
-        if 'patch_embed.proj.weight' in k:
+        if "patch_embed.proj.weight" in k:
             O, I, H, W = model.backbone.patch_embed.proj.weight.shape
             if len(v.shape) < 4:
                 # For old models that I trained prior to conv based patchification
@@ -177,7 +182,7 @@ def checkpoint_filter_fn(
         # elif 'downstream_head1.dpt.head.0.weight' in k or 'downstream_head2.dpt.head.0.weight' in k:
         #     v = adapt_head_conv(v)
 
-        elif 'decoder_embed.weight' in k:
+        elif "decoder_embed.weight" in k:
             O, I = model.backbone.decoder_embed.weight.shape
             if v.shape[1] != I:
                 v = adapt_linear(v)
@@ -185,13 +190,13 @@ def checkpoint_filter_fn(
         out_dict[k] = v
 
     # add prefix to make our model happy
-    prefix = 'backbone.'
-    out_dict = {prefix + k if 'downstream_head' not in k else k: v for k, v in out_dict.items()}
+    prefix = "backbone."
+    out_dict = {prefix + k if "downstream_head" not in k else k: v for k, v in out_dict.items()}
 
     # # remove the conf head weights
-    out_dict['downstream_head1.dpt.head.4.weight'] = out_dict['downstream_head1.dpt.head.4.weight'][0:3]
-    out_dict['downstream_head1.dpt.head.4.bias'] = out_dict['downstream_head1.dpt.head.4.bias'][0:3]
-    out_dict['downstream_head2.dpt.head.4.weight'] = out_dict['downstream_head2.dpt.head.4.weight'][0:3]
-    out_dict['downstream_head2.dpt.head.4.bias'] = out_dict['downstream_head2.dpt.head.4.bias'][0:3]
+    out_dict["downstream_head1.dpt.head.4.weight"] = out_dict["downstream_head1.dpt.head.4.weight"][0:3]
+    out_dict["downstream_head1.dpt.head.4.bias"] = out_dict["downstream_head1.dpt.head.4.bias"][0:3]
+    out_dict["downstream_head2.dpt.head.4.weight"] = out_dict["downstream_head2.dpt.head.4.weight"][0:3]
+    out_dict["downstream_head2.dpt.head.4.bias"] = out_dict["downstream_head2.dpt.head.4.bias"][0:3]
 
     return out_dict

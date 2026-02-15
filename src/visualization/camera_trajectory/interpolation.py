@@ -238,7 +238,7 @@ def interpolate_extrinsics(
         final_origin[~parallel_mask],
         final_look[~parallel_mask],
     )
-    
+
     # Convert to pivot parameters.
     pivot_frame = generate_rotation_coordinate_frame(initial_look, final_look, eps=eps)
     initial_params = extrinsics_to_pivot_parameters(initial, pivot_frame, pivot_point)

@@ -12,10 +12,7 @@ from .drawing.cameras import compute_equal_aabb_with_margin
 def pad(images: list[Shaped[Tensor, "..."]]) -> list[Shaped[Tensor, "..."]]:
     shapes = torch.stack([torch.tensor(x.shape) for x in images])
     padded_shape = shapes.max(dim=0)[0]
-    results = [
-        torch.ones(padded_shape.tolist(), dtype=x.dtype, device=x.device)
-        for x in images
-    ]
+    results = [torch.ones(padded_shape.tolist(), dtype=x.dtype, device=x.device) for x in images]
     for image, result in zip(images, results):
         slices = [slice(0, x) for x in image.shape]
         result[slices] = image[slices]
@@ -35,9 +32,7 @@ def render_projections(
     # Compute the minima and maxima of the scene.
     minima = gaussians.means.min(dim=1).values
     maxima = gaussians.means.max(dim=1).values
-    scene_minima, scene_maxima = compute_equal_aabb_with_margin(
-        minima, maxima, margin=margin
-    )
+    scene_minima, scene_maxima = compute_equal_aabb_with_margin(minima, maxima, margin=margin)
 
     projections = []
     for look_axis in range(3):
@@ -49,12 +44,8 @@ def render_projections(
         extrinsics[:, right_axis, 0] = 1
         extrinsics[:, down_axis, 1] = 1
         extrinsics[:, look_axis, 2] = 1
-        extrinsics[:, right_axis, 3] = 0.5 * (
-            scene_minima[:, right_axis] + scene_maxima[:, right_axis]
-        )
-        extrinsics[:, down_axis, 3] = 0.5 * (
-            scene_minima[:, down_axis] + scene_maxima[:, down_axis]
-        )
+        extrinsics[:, right_axis, 3] = 0.5 * (scene_minima[:, right_axis] + scene_maxima[:, right_axis])
+        extrinsics[:, down_axis, 3] = 0.5 * (scene_minima[:, down_axis] + scene_maxima[:, down_axis])
         extrinsics[:, look_axis, 3] = scene_minima[:, look_axis]
         extrinsics[:, 3, 3] = 1
 
@@ -103,12 +94,8 @@ def render_cameras(batch: dict, resolution: int) -> Float[Tensor, "3 3 height wi
 
     return draw_cameras(
         resolution,
-        torch.cat(
-            (batch["context"]["extrinsics"][0], batch["target"]["extrinsics"][0])
-        ),
-        torch.cat(
-            (batch["context"]["intrinsics"][0], batch["target"]["intrinsics"][0])
-        ),
+        torch.cat((batch["context"]["extrinsics"][0], batch["target"]["extrinsics"][0])),
+        torch.cat((batch["context"]["intrinsics"][0], batch["target"]["intrinsics"][0])),
         color,
         torch.cat((batch["context"]["near"][0], batch["target"]["near"][0])),
         torch.cat((batch["context"]["far"][0], batch["target"]["far"][0])),

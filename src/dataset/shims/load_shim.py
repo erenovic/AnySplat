@@ -1,5 +1,6 @@
 import cv2
 
+
 def imread_cv2(path, options=cv2.IMREAD_COLOR):
     """Open an image or a depthmap with opencv-python."""
     if path.endswith((".exr", "EXR")):

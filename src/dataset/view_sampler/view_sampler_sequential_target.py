@@ -92,9 +92,7 @@ class ViewSamplerSequentialTarget(ViewSampler[ViewSamplerSequentialTargetCfg]):
             )
 
         # --- pick a random context window size ---
-        context_gap = torch.randint(
-            min_gap, max_gap + 1, size=(), device=device
-        ).item()
+        context_gap = torch.randint(min_gap, max_gap + 1, size=(), device=device).item()
 
         # --- pick a random starting position ---
         # The window spans [start, start + context_gap] and targets span
@@ -104,9 +102,7 @@ class ViewSamplerSequentialTarget(ViewSampler[ViewSamplerSequentialTargetCfg]):
         if self.stage == "test" or self.is_overfitting:
             start = 0
         else:
-            start = torch.randint(
-                0, max(max_start, 0) + 1, size=(), device=device
-            ).item()
+            start = torch.randint(0, max(max_start, 0) + 1, size=(), device=device).item()
 
         # --- select context views via farthest point sampling ---
         window_indices = torch.arange(start, start + context_gap + 1)

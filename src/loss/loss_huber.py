@@ -5,6 +5,7 @@ from copy import copy, deepcopy
 from src.model.encoder.vggt.utils.pose_enc import pose_encoding_to_extri_intri
 from src.model.encoder.vggt.utils.rotation import mat_to_quat
 
+
 def extri_intri_to_pose_encoding(
     extrinsics,
     intrinsics,
@@ -46,7 +47,7 @@ def extri_intri_to_pose_encoding(
     if pose_encoding_type == "absT_quaR_FoV":
         R = extrinsics[:, :, :3, :3]  # BxSx3x3
         T = extrinsics[:, :, :3, 3]  # BxSx3
-        
+
         quat = mat_to_quat(R)
         # Note the order of h and w here
         # H, W = image_size_hw
@@ -60,12 +61,14 @@ def extri_intri_to_pose_encoding(
 
     return pose_encoding
 
+
 def huber_loss(x, y, delta=1.0):
     """Calculate element-wise Huber loss between x and y"""
     diff = x - y
     abs_diff = diff.abs()
     flag = (abs_diff <= delta).to(diff.dtype)
     return flag * 0.5 * diff**2 + (1 - flag) * delta * (abs_diff - 0.5 * delta)
+
 
 class HuberLoss(nn.Module):
     def __init__(self, alpha=1.0, delta=1.0, gamma=0.6, weight_T=1.0, weight_R=1.0, weight_fl=0.5):
@@ -104,25 +107,27 @@ class HuberLoss(nn.Module):
         loss_T = loss_T.mean()
         loss_R = loss_R.mean()
         loss_fl = loss_fl.mean()
-        
+
         return loss_T, loss_R, loss_fl
 
     def forward(self, pred_pose_enc_list, batch):
         context_extrinsics = batch["context"]["extrinsics"]
         context_intrinsics = batch["context"]["intrinsics"]
         image_size_hw = batch["context"]["image"].shape[-2:]
-        
+
         # transform extrinsics and intrinsics to pose_enc
         GT_pose_enc = extri_intri_to_pose_encoding(context_extrinsics, context_intrinsics, image_size_hw)
         num_predictions = len(pred_pose_enc_list)
         loss_T = loss_R = loss_fl = 0
-        
+
         for i in range(num_predictions):
             i_weight = self.gamma ** (num_predictions - i - 1)
 
             cur_pred_pose_enc = pred_pose_enc_list[i]
 
-            loss_T_i, loss_R_i, loss_fl_i = self.camera_loss_single(cur_pred_pose_enc.clone(), GT_pose_enc.clone(), loss_type="huber")
+            loss_T_i, loss_R_i, loss_fl_i = self.camera_loss_single(
+                cur_pred_pose_enc.clone(), GT_pose_enc.clone(), loss_type="huber"
+            )
             loss_T += i_weight * loss_T_i
             loss_R += i_weight * loss_R_i
             loss_fl += i_weight * loss_fl_i
@@ -132,17 +137,12 @@ class HuberLoss(nn.Module):
         loss_fl = loss_fl / num_predictions
         loss_camera = loss_T * self.weight_T + loss_R * self.weight_R + loss_fl * self.weight_fl
 
-        loss_dict = {
-            "loss_camera": loss_camera,
-            "loss_T": loss_T,
-            "loss_R": loss_R,
-            "loss_fl": loss_fl
-        }
+        loss_dict = {"loss_camera": loss_camera, "loss_T": loss_T, "loss_R": loss_R, "loss_fl": loss_fl}
 
         # with torch.no_grad():
         #     # compute auc
         #     last_pred_pose_enc = pred_pose_enc_list[-1]
-            
+
         #     last_pred_extrinsic, _ = pose_encoding_to_extri_intri(last_pred_pose_enc.detach(), image_size_hw, pose_encoding_type='absT_quaR_FoV', build_intrinsics=False)
 
         #     rel_rangle_deg, rel_tangle_deg = camera_to_rel_deg(last_pred_extrinsic.float(), context_extrinsics.float(), context_extrinsics.device)
@@ -168,4 +168,3 @@ class HuberLoss(nn.Module):
         #         loss_dict[f"Auc_{auc_threshold}"] = cur_auc
 
         return loss_dict
-
