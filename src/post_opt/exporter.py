@@ -20,6 +20,19 @@ def sh2rgb(sh: torch.Tensor) -> torch.Tensor:
     return sh * C0 + 0.5
 
 
+def rgb2sh(rgb: torch.Tensor) -> torch.Tensor:
+    """Convert Sphere Harmonics to RGB
+
+    Args:
+        sh (torch.Tensor): SH tensor
+
+    Returns:
+        torch.Tensor: RGB tensor
+    """
+    C0 = 0.28209479177387814
+    return (rgb - 0.5) / C0
+
+
 def part1by2_vec(x: torch.Tensor) -> torch.Tensor:
     """Interleave bits of x with 0s
 
