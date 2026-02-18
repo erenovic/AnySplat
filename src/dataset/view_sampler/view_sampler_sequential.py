@@ -29,6 +29,14 @@ class ViewSamplerSequentialCfg:
     #        whole video.
     # 0.2 -> the 20% of frames closest to start — local cluster, balanced.
     neighbour_scale: float = 0.3
+    # Minimum normalised SE(3) distance between consecutive frames in the output
+    # sequence.  Expressed as a fraction of the median pairwise distance among
+    # the FPS-selected frames.  0.0 disables the minimum constraint.
+    min_pair_distance: float = 0.0
+    # Maximum normalised SE(3) distance between consecutive frames.  Expressed
+    # as a fraction of the median pairwise distance among FPS-selected frames.
+    # 0.0 disables the maximum constraint.
+    max_pair_distance: float = 0.0
 
     def __post_init__(self):
         # Unique frames FPS must select (shared boundary frames are not duplicated yet).
@@ -69,6 +77,91 @@ class ViewSamplerSequential(ViewSampler[ViewSamplerSequentialCfg]):
 
         return selected
 
+    @staticmethod
+    def _sequential_chain(
+        dist_matrix: Tensor, candidates: Tensor, n: int, min_d: float, max_d: float
+    ) -> Tensor:
+        """Build a monotonically-increasing chain of *n* frames from *candidates*.
+
+        Sorts *candidates* by video index, then walks forward: from the current
+        frame, picks the next frame (by video index) whose SE(3) distance lies
+        in [min_d, max_d].  This guarantees the output indices are strictly
+        increasing while enforcing spacing.
+
+        The candidate pool should be larger than n so the chain can skip frames
+        that are too close without running out.
+
+        When no future frame satisfies both bounds, constraints are relaxed
+        progressively: first drop the max bound, then drop both bounds.  Each
+        candidate is used at most once so indices are never repeated.
+
+        Args:
+            dist_matrix: (N, N) pairwise distance matrix (full, not subsetted).
+            candidates:  (C,) indices into dist_matrix (C >= n).
+            n:           number of frames to select.
+            min_d:       absolute minimum distance between consecutive frames.
+            max_d:       absolute maximum distance (0 = disabled).
+
+        Returns:
+            (n,) indices in strictly increasing order forming the chain.
+        """
+        # Sort candidates by video index so we only walk forward.
+        sorted_cands = candidates.sort().values  # (C,)
+        C = sorted_cands.shape[0]
+        device = sorted_cands.device
+
+        chain = torch.zeros(n, dtype=torch.long, device=device)
+        chain[0] = sorted_cands[0]
+        used = {0}  # indices into sorted_cands that have been consumed
+        ptr = 0  # pointer into sorted_cands
+
+        for i in range(1, n):
+            cur = chain[i - 1].item()
+            best_idx = -1
+
+            # Pass 1: first unused candidate satisfying both [min_d, max_d].
+            for j in range(ptr + 1, C):
+                if j in used:
+                    continue
+                d = dist_matrix[cur, sorted_cands[j].item()].item()
+                if d >= min_d and (max_d <= 0 or d <= max_d):
+                    best_idx = j
+                    break
+
+            # Pass 2: relax max — only enforce min_d.
+            if best_idx < 0 and min_d > 0:
+                for j in range(ptr + 1, C):
+                    if j in used:
+                        continue
+                    d = dist_matrix[cur, sorted_cands[j].item()].item()
+                    if d >= min_d:
+                        best_idx = j
+                        break
+
+            # Pass 3: any unused candidate forward of ptr.
+            if best_idx < 0:
+                for j in range(ptr + 1, C):
+                    if j not in used:
+                        best_idx = j
+                        break
+
+            # Pass 4: any unused candidate at all (avoids repeating indices).
+            if best_idx < 0:
+                for j in range(C):
+                    if j not in used:
+                        best_idx = j
+                        break
+
+            # Truly exhausted (C < n) — duplicate last as last resort.
+            if best_idx < 0:
+                best_idx = ptr
+
+            chain[i] = sorted_cands[best_idx]
+            used.add(best_idx)
+            ptr = best_idx
+
+        return chain
+
     def sample(
         self,
         scene: str,
@@ -105,7 +198,22 @@ class ViewSamplerSequential(ViewSampler[ViewSamplerSequentialCfg]):
         # FPS on the candidate set using the precomputed submatrix.
         dist_cand = dist_all[candidates][:, candidates]  # (C, C)
         fps_cand = self._fps_pose_distance(dist_cand, n)
-        view_indices = candidates[fps_cand].sort().values  # (n,) sorted
+        fps_global = candidates[fps_cand]  # (n,) indices into dist_all
+
+        # Order the FPS-selected frames into a chain with spacing constraints.
+        if self.cfg.min_pair_distance > 0 or self.cfg.max_pair_distance > 0:
+            # Compute absolute thresholds from the median pairwise distance
+            # among the FPS-selected frames.
+            fps_dist = dist_all[fps_global][:, fps_global]  # (n, n)
+            triu_mask = torch.triu(torch.ones(n, n, dtype=torch.bool, device=device), diagonal=1)
+            median_d = fps_dist[triu_mask].median().item()
+            min_d = self.cfg.min_pair_distance * median_d
+            max_d = self.cfg.max_pair_distance * median_d
+            # Pass the full candidate pool (not just FPS subset) so the chain
+            # can skip close frames without running out of candidates.
+            view_indices = self._sequential_chain(dist_all, candidates, n, min_d, max_d)
+        else:
+            view_indices = fps_global.sort().values  # (n,) original behaviour
 
         # Expand with scene-boundary overlap: each group's last frame becomes the
         # first frame of the next group, so consecutive scenes share one view.
