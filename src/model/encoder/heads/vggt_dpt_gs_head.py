@@ -159,7 +159,7 @@ class VGGT_DPT_GS_Head(DPTHead):
         # Fuse features from multiple layers.
         out = self.scratch_forward(out)
         direct_img_feat = self.input_merger(imgs.flatten(0, 1))
-        out = F.interpolate(out, size=(H, W), mode="bilinear", align_corners=True)
+        out = F.interpolate(out.contiguous(), size=(H, W), mode="bilinear", align_corners=True)
         out = out + direct_img_feat
 
         if self.pos_embed:
