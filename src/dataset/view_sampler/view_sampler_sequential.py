@@ -28,7 +28,7 @@ class ViewSamplerSequentialCfg:
     # 1.0 -> all N frames — maximum diversity, same as running FPS over the
     #        whole video.
     # 0.2 -> the 20% of frames closest to start — local cluster, balanced.
-    neighbour_scale: float = 0.3
+    neighbour_scale: float = 1.0
     # Minimum normalised SE(3) distance between consecutive frames in the output
     # sequence.  Expressed as a fraction of the median pairwise distance among
     # the FPS-selected frames.  0.0 disables the minimum constraint.
@@ -79,7 +79,7 @@ class ViewSamplerSequential(ViewSampler[ViewSamplerSequentialCfg]):
 
     @staticmethod
     def _sequential_chain(
-        dist_matrix: Tensor, candidates: Tensor, n: int, min_d: float, max_d: float
+        dist_matrix: Tensor, candidates: Tensor, n: int, min_d: float, max_d: float, start: int = -1
     ) -> Tensor:
         """Build a monotonically-increasing chain of *n* frames from *candidates*.
 
@@ -111,9 +111,14 @@ class ViewSamplerSequential(ViewSampler[ViewSamplerSequentialCfg]):
         device = sorted_cands.device
 
         chain = torch.zeros(n, dtype=torch.long, device=device)
-        chain[0] = sorted_cands[0]
-        used = {0}  # indices into sorted_cands that have been consumed
-        ptr = 0  # pointer into sorted_cands
+        # Seed from the requested start frame if it is in the candidate set,
+        # otherwise fall back to the first (smallest-index) candidate.
+        seed_pos = 0
+        if start >= 0 and (sorted_cands == start).any():
+            seed_pos = int((sorted_cands == start).nonzero(as_tuple=True)[0][0].item())
+        chain[0] = sorted_cands[seed_pos]
+        used = {seed_pos}  # indices into sorted_cands that have been consumed
+        ptr = seed_pos  # pointer into sorted_cands
 
         for i in range(1, n):
             cur = chain[i - 1].item()
@@ -184,10 +189,13 @@ class ViewSamplerSequential(ViewSampler[ViewSamplerSequentialCfg]):
         dist_all = (t_norm**2 + (self.cfg.rotation_scale * R_all) ** 2).sqrt()  # (N, N)
 
         # Random start frame (deterministic for test/overfit).
+        # Cap so that at least 2*n frames remain after `start`, giving the
+        # sequential chain enough slack to skip close frames for spacing.
+        max_start = max(0, N - 2 * n)
         if self.stage == "test" or self.is_overfitting:
-            start = int(dist_all.mean(0).argmax().item())
+            start = int(dist_all[:max_start + 1].mean(0).argmax().item()) if max_start > 0 else 0
         else:
-            start = int(torch.randint(0, N, (), device=device).item())
+            start = int(torch.randint(0, max_start + 1, (), device=device).item())
 
         # Candidate set: the (neighbour_scale * N) frames closest to `start`.
         # neighbour_scale=1.0 -> all frames; 0.2 -> the closest 20%; etc.
@@ -209,11 +217,25 @@ class ViewSamplerSequential(ViewSampler[ViewSamplerSequentialCfg]):
             median_d = fps_dist[triu_mask].median().item()
             min_d = self.cfg.min_pair_distance * median_d
             max_d = self.cfg.max_pair_distance * median_d
-            # Pass the full candidate pool (not just FPS subset) so the chain
-            # can skip close frames without running out of candidates.
-            view_indices = self._sequential_chain(dist_all, candidates, n, min_d, max_d)
+            # Only keep candidates at or after `start` so the chain never
+            # wraps around to earlier frames.
+            forward_cands = candidates[candidates >= start]
+            if forward_cands.shape[0] < n:
+                # Not enough forward frames — shift start earlier to guarantee n.
+                forward_cands = candidates.sort().values[-n:]
+                start = forward_cands[0].item()
+            view_indices = self._sequential_chain(dist_all, forward_cands, n, min_d, max_d, start=start)
         else:
             view_indices = fps_global.sort().values  # (n,) original behaviour
+
+        # Fallback: if the chain is not monotonically ascending, sample a
+        # contiguous range with a random stride of 2–5.
+        if (view_indices[1:] <= view_indices[:-1]).any():
+            stride_fb = int(torch.randint(2, 6, (), device=device).item())
+            span = stride_fb * (n - 1)  # total frames spanned
+            max_fb_start = max(0, N - span - 1)
+            fb_start = int(torch.randint(0, max_fb_start + 1, (), device=device).item())
+            view_indices = torch.arange(fb_start, fb_start + span + 1, stride_fb, device=device)[:n]
 
         # Expand with scene-boundary overlap: each group's last frame becomes the
         # first frame of the next group, so consecutive scenes share one view.
