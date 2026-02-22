@@ -231,7 +231,8 @@ class ViewSamplerSequential(ViewSampler[ViewSamplerSequentialCfg]):
         # Fallback: if the chain is not monotonically ascending, sample a
         # contiguous range with a random stride of 2–5.
         if (view_indices[1:] <= view_indices[:-1]).any():
-            stride_fb = int(torch.randint(2, 6, (), device=device).item())
+            # stride_fb = int(torch.randint(1, 3, (), device=device).item())
+            stride_fb = 1
             span = stride_fb * (n - 1)  # total frames spanned
             max_fb_start = max(0, N - span - 1)
             fb_start = int(torch.randint(0, max_fb_start + 1, (), device=device).item())

@@ -39,11 +39,14 @@ class ViewSampler(ABC, Generic[T]):
         extrinsics: Float[Tensor, "view 4 4"],
         intrinsics: Float[Tensor, "view 3 3"],
         device: torch.device = torch.device("cpu"),
-    ) -> tuple[
-        Int64[Tensor, " context_view"],  # indices for context views
-        Int64[Tensor, " target_view"],  # indices for target views
-        Float[Tensor, " overlap"],  # overlap
-    ]:
+    ) -> (
+        tuple[
+            Int64[Tensor, " context_view"],  # indices for context views
+            Int64[Tensor, " target_view"],  # indices for target views
+            Float[Tensor, " overlap"],  # overlap
+        ]
+        | Int64[Tensor, " view"]
+    ):
         pass
 
     @property
