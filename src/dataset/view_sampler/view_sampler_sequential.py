@@ -209,6 +209,7 @@ class ViewSamplerSequential(ViewSampler[ViewSamplerSequentialCfg]):
         fps_global = candidates[fps_cand]  # (n,) indices into dist_all
 
         # Order the FPS-selected frames into a chain with spacing constraints.
+        min_d, max_d = -1, -1
         if self.cfg.min_pair_distance > 0 or self.cfg.max_pair_distance > 0:
             # Compute absolute thresholds from the median pairwise distance
             # among the FPS-selected frames.
@@ -228,15 +229,22 @@ class ViewSamplerSequential(ViewSampler[ViewSamplerSequentialCfg]):
         else:
             view_indices = fps_global.sort().values  # (n,) original behaviour
 
-        # Fallback: if the chain is not monotonically ascending, sample a
-        # contiguous range with a random stride of 2–5.
+        # Fallback: _sequential_chain can emit non-monotonic indices when Pass 4
+        # (unconstrained backward pick) fires under tight spacing constraints with
+        # large num_scenes. Recover by sampling n evenly-spaced frames across the
+        # video so consecutive scenes stay well-separated regardless of num_scenes.
         if (view_indices[1:] <= view_indices[:-1]).any():
-            # stride_fb = int(torch.randint(1, 3, (), device=device).item())
-            stride_fb = 1
-            span = stride_fb * (n - 1)  # total frames spanned
+            stride_fb = max(1, N // n)
+            span = stride_fb * (n - 1)
             max_fb_start = max(0, N - span - 1)
-            fb_start = int(torch.randint(0, max_fb_start + 1, (), device=device).item())
+            fb_start = 0
+            if not (self.stage == "test" or self.is_overfitting):
+                fb_start = int(torch.randint(0, max_fb_start + 1, (), device=device).item())
             view_indices = torch.arange(fb_start, fb_start + span + 1, stride_fb, device=device)[:n]
+            # print(
+            #     f"Warning: sequential sampler had to fall back to evenly spaced sampling for scene '{scene}' "
+            #     f"({N} frames, {n} requested, min_d={min_d:.3f}, max_d={max_d:.3f})."
+            # )
 
         # Expand with scene-boundary overlap: each group's last frame becomes the
         # first frame of the next group, so consecutive scenes share one view.
