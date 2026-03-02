@@ -44,8 +44,7 @@ class ViewSampler(ABC, Generic[T]):
             Int64[Tensor, " context_view"],  # indices for context views
             Int64[Tensor, " target_view"],  # indices for target views
             Float[Tensor, " overlap"],  # overlap
-        ]
-        | Int64[Tensor, " view"]
+        ] | Int64[Tensor, " view"]
     ):
         pass
 
