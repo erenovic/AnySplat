@@ -193,7 +193,8 @@ class ViewSamplerSequential(ViewSampler[ViewSamplerSequentialCfg]):
         # sequential chain enough slack to skip close frames for spacing.
         max_start = max(0, N - 2 * n)
         if self.stage == "test" or self.is_overfitting:
-            start = int(dist_all[:max_start + 1].mean(0).argmax().item()) if max_start > 0 else 0
+            # start = int(dist_all[:max_start + 1].mean(0).argmax().item()) if max_start > 0 else 0
+            start = 0
         else:
             start = int(torch.randint(0, max_start + 1, (), device=device).item())
 
