@@ -139,7 +139,7 @@ def rescale_and_crop(
         # changing the intrinsics based on how the images are rounded.
         *batch, c, h, w = images.shape
         images = images.reshape(-1, c, h, w)
-        images = torch.stack([rescale(image, (h_scaled, w_scaled)) for image in images])
+        images = F.resize(images, [h_scaled, w_scaled], interpolation=F.InterpolationMode.BILINEAR, antialias=True)
         images = images.reshape(*batch, c, h_scaled, w_scaled)
 
         if depths is not None:
